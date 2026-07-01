@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: axentria-document-downloader
+
+download:
+  url: "https://freekidsbooks.org"
+  cssSelector: "a.download-book.my-post-like"
+  directory: "/mnt/Downloads"
+  s3:
+    bucket: "${S3_BUCKET:}"
+
+management:
+  endpoints:
+    jmx:
+      exposure:
+        include: "health,info"
