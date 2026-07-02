@@ -1,0 +1,1891 @@
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" 
+content="text/html; charset=UTF-8"><title>
+ Axentria CI
+</title><link rel="SHORTCUT ICON" 
+href="http://pyhmlw415/AxentriaCI/favicon.ico"><link href="./Axentria 
+CI_files/Styles.css" rel="stylesheet" type="text/css"><link href="./Axentria 
+CI_files/Styles2.css" rel="stylesheet" type="text/css"><link href="./Axentria 
+CI_files/Styles3.css" rel="stylesheet" type="text/css">
+    <script src="./Axentria CI_files/jquery.js.descarga" 
+type="text/javascript"></script>
+    <script src="./Axentria CI_files/PersistenciaGUI.js.descarga" 
+type="text/javascript"></script>
+    <script src="./Axentria CI_files/moment.min.js.descarga" 
+type="text/javascript"></script>
+    <style type="text/css">
+        div.RadWindow
+        {
+            z-index: 20000 !important;
+            position: fixed !important;
+        }
+    </style>
+    <!--[if lt IE 9]>
+    <style type="text/css">
+        body 
+        {
+            height: 650px !important;
+            min-height: inherit !important;
+        }
+    </style>
+    <![endif]-->
+    
+        <script type="text/javascript">
+            var column = null;
+            var documentsView = [];
+            function FilterMenuShowing(sender, eventArgs) {
+                column = eventArgs.get_column();
+            }
+            function MenuShowing(sender, args) {
+                if (column == null) return;
+                var menu = sender;
+                var items = menu.get_items();
+                var enabledCommands = {};
+                if (column.get_dataType() == "System.DateTime" || 
+column.get_dataType() == "System.Int64" || column.get_dataType() == "System.Int32" 
+|| column.get_dataType() == "System.Decimal") {
+                    enabledCommands = { 'NoFilter': '', 'GreaterThan': '', 
+'GreaterThanOrEqualTo': '', 'LessThan': '', 'LessThanOrEqualTo': '', /* 'Between': 
+'',*/'EqualTo': '', 'NotEqualTo': '', 'NotIsEmpty': '', 'IsEmpty': '' };
+                } else {
+                    enabledCommands = { 'NoFilter': '', 'EqualTo': '', 
+'NotEqualTo': '', 'NotIsEmpty': '', 'IsEmpty': '', 'Contains': '', 
+'DoesNotContain': '', 'StartsWith': '', 'EndsWith': '' };
+                }
+                var i = 0;
+                while (i < items.get_count()) {
+                    if (!(items.getItem(i).get_value() in enabledCommands)) {
+                        var item = items.getItem(i);
+                        if (item != null)
+                            item.set_visible(false);
+                    }
+                    else {
+                        var item = items.getItem(i);
+                        if (item != null)
+                            item.set_visible(true);
+                    }
+                    i++;
+                }
+                column = null;
+            }
+            var selectedItem = null;
+            function OnGridCreated(sender, args) {
+                setTimeout(function () {
+                    if (radGridResultado_ChangingPage) {
+                        if (radGridResultado_ChangingFromPage > 
+sender.MasterTableView.get_currentPageIndex()) {
+                            //Si viene de la pagina siguiente con el teclado
+                            SelectLastElement(sender);
+                        } else {
+                            SelectFirstElement(sender);
+                        }
+                    } else {
+                        SelectFirstElement(sender);
+                    }
+                    radGridResultado_ChangingPage = false;
+                    sender.get_element().focus();
+                }, 1);
+            }
+            function OnRowSelecting(sender, eventArgs) {
+                if (selectedItem != null) {
+                    var scrollArea = 
+document.getElementById(sender.get_element().id + "_GridData");
+                    var scrollPos = scrollArea.scrollTop;
+                    var domEvent = eventArgs.get_domEvent();
+                    //console.log(domEvent);                    
+                    if (domEvent && (domEvent.type == "keydown" || domEvent.type ==
+"keypress")) {
+                        if (domEvent.keyCode == 40 || domEvent.charCode == 40 
+/*Down Arrow*/) {
+                            if (SelectNextItem(sender, selectedItem)) {
+                                eventArgs.set_cancel(true);
+                            }
+                        } else if (domEvent.keyCode == 38 || domEvent.charCode == 
+38  /*Up Arrow*/) {
+                            if (SelectPrevItem(sender, selectedItem)) {
+                                eventArgs.set_cancel(true);
+                            }
+                        }
+                    }
+                    if (scrollPos) scrollArea.scrollTop = scrollPos;
+                }
+            }
+            function SelectFirstElement(grid) {
+                var dataItems = grid.MasterTableView.get_dataItems();
+                if (dataItems.length > 0) {
+                    dataItems[0].set_selected(true);
+                    CollapseAllGroupsAndExpandItem(grid, dataItems[0]);
+                }
+            }
+            function SelectLastElement(grid) {
+                var dataItems = grid.MasterTableView.get_dataItems();
+                if (dataItems.length > 0) {
+                    dataItems[dataItems.length - 1].set_selected(true);
+                    CollapseAllGroupsAndExpandItem(grid, dataItems[dataItems.length- 1]);
+                }
+            }
+            function SelectNextItem(grid, item) {
+                var res = false;
+                var dataItems = grid.MasterTableView.get_dataItems();
+                for (var i = 0; i < dataItems.length && !res; i++) {
+                    if (dataItems[i].get_id() == item.get_id()) {
+                        res = true;
+                        if (i + 1 < dataItems.length) {
+                            dataItems[i + 1].set_selected(true);
+                            CollapseAllGroupsAndExpandItem(grid, dataItems[i + 1]);
+                        } else {
+                            var pageIndex = 
+grid.MasterTableView.get_currentPageIndex();
+                            if (pageIndex < grid.MasterTableView.PageCount - 1) {
+                                grid.MasterTableView.fireCommand("Page", "Next");
+                                radGridResultado_ChangingPage = true;
+                                radGridResultado_ChangingFromPage = 
+grid.MasterTableView.get_currentPageIndex();
+                            }
+                        }
+                    }
+                }
+                return res;
+            }
+            function SelectPrevItem(grid, item) {
+                var res = false;
+                var dataItems = grid.MasterTableView.get_dataItems();
+                for (var i = 0; i < dataItems.length && !res; i++) {
+                    if (dataItems[i].get_id() == item.get_id()) {
+                        res = true;
+                        if (i - 1 >= 0) {
+                            dataItems[i - 1].set_selected(true);
+                            CollapseAllGroupsAndExpandItem(grid, dataItems[i - 1]);
+                        } else {
+                            if (0 < grid.MasterTableView.get_currentPageIndex()) {
+                                grid.MasterTableView.fireCommand("Page", "Prev");
+                                radGridResultado_ChangingPage = true;
+                                radGridResultado_ChangingFromPage = 
+grid.MasterTableView.get_currentPageIndex();
+                            }
+                        }
+                    }
+                }
+                return res;
+            }
+            var radGridResultado_SelectingRow = false;
+            var radGridResultado_ChangingPage = false;
+            var radGridResultado_ChangingFromPage = -1;
+            function SetVisorDocumentUrl(doid, veid, url, firmaValida) {
+                if (firmaValida == "False") {
+                    var confirmFirma = "La firma digital del documento no es 
+válida. ¿Desea visualizar el documento de todas formas?";
+                    var wind = radconfirm(confirmFirma, function (arg) {
+                        if (arg) {
+                            $('#visor').attr('src', url);
+                        } else {
+                            $('#visor').attr('src', '');
+                        }
+                        radGridResultado_SelectingRow = false;
+                        $find("RadGridResultado").get_element().focus();
+                    }, 330, 180, null, "Advertencia");
+                    var ajaxPanel = $find("RadAjaxPanel1");
+                    if (ajaxPanel != null)
+                        ajaxPanel.ajaxRequest("enviomail:" + doid);
+                    wind.set_restrictionZoneID("pagina");
+                } else {
+                    $('#visor').attr('src', url);
+                    radGridResultado_SelectingRow = false;
+                }
+            }
+            function OnRowSelected(sender, eventArgs) {
+                if (radGridResultado_SelectingRow) {
+                    return;
+                }
+                var scrollArea = document.getElementById(sender.get_element().id + 
+"_GridData");
+                var scrollPos = scrollArea.scrollTop;
+                radGridResultado_SelectingRow = false;
+                selectedItem = eventArgs.get_item();
+                var url = selectedItem.getDataKeyValue("Url");
+                var firmaValida = selectedItem.getDataKeyValue("FirmaValida");
+               
+                if (firmaValida == "False") {
+                    if ($find("RadAjaxPanel1") != null) {
+                        var confirmFirma = "La firma digital del documento no es 
+válida. ¿Desea visualizar el documento de todas formas?";
+                        var wind = radconfirm(confirmFirma, function (arg) {
+                            if (arg) {
+                                $('#visor').attr('src', url);
+                            } else {
+                                $('#visor').attr('src', '');
+                            }
+                            radGridResultado_SelectingRow = false;
+                            sender.get_element().focus();
+                        }, 330, 180, null, "Advertencia");
+                        $find("RadAjaxPanel1").ajaxRequest("enviomail:" + 
+selectedItem.getDataKeyValue("IdDocumento"));
+                        wind.set_restrictionZoneID("pagina");
+                    }
+                    else {
+                        selectedItem.set_selected(false);
+                        radGridResultado_SelectingRow = false;
+                    }
+                } else {
+                    $('#visor').attr('src', url);
+                    radGridResultado_SelectingRow = false
+                    //Agregamos evento de visualizacion de documento, solo una vez 
+por cada documento. 
+                    //Consultamos si el archivo que seleccionamos ya existe en el 
+array.
+                    if 
+(!documentsView.includes(selectedItem.getDataKeyValue("IdDocumento"))) {
+                        //Agregamos el documento a un array.
+                        
+documentsView.push(selectedItem.getDataKeyValue("IdDocumento"))
+                        //Generamos el suceso
+                        PageMethods.GenerarSuceso(12, 
+selectedItem.getDataKeyValue("IdDocumento"))
+                    }
+                }
+                MostrarVersion(selectedItem.getDataKeyValue("Version"), true);
+                CollapseAllGroupsAndExpandItem(sender, eventArgs.get_item());
+                ActualizarToolbar();
+                if (scrollPos) scrollArea.scrollTop = scrollPos;
+            }
+            function VisualizarVersionDoc(doid, version, url, firmaValida, 
+ultimaVersion) {
+                var versionOk = false;
+                if (firmaValida == "False") {
+                    if ($find("RadAjaxPanel1") != null) {
+                        var confirmFirma = "La firma digital del documento no es 
+válida. ¿Desea visualizar el documento de todas formas?";
+                        var wind = radconfirm(confirmFirma, function (arg) {
+                            if (arg) {
+                                $('#visor').attr('src', url);
+                                versionOk = true;
+                            } else {
+                                $('#visor').attr('src', '');
+                            }
+                        }, 330, 180, null, "Advertencia");
+                        $find("RadAjaxPanel1").ajaxRequest("enviomail:" + 
+selectedItem.getDataKeyValue("IdDocumento"));
+                        wind.set_restrictionZoneID("pagina");
+                    }
+                } else {
+                    $('#visor').attr('src', url);
+                    versionOk = true;
+                }
+                if (versionOk) {
+                    MostrarVersion(version, (ultimaVersion == "True"));
+                } else {
+                    OcultarVersion();
+                }
+            }
+            function ActualizarToolbar() {
+                var grid = $find("RadGridResultado");
+                var exportarEnabled = false;
+                var propiedadesEnabled = false;
+                if (grid.get_masterTableView()) {
+                    var items = grid.get_masterTableView().get_selectedItems();
+                    if (items.length >= 1) {
+                        var exportarEnabled = true;
+                        var propiedadesEnabled = true;
+                        if (items.length > 1) {
+                            propiedadesEnabled = false;
+                        }
+                    }
+                }
+                var toolbar = $find("RadToolBar1");
+                if (toolbar) {
+                    var propItem = toolbar.findItemByValue("propiedades");
+                    if (propItem) {
+                        if (propiedadesEnabled) {
+                            propItem.enable();
+                        } else {
+                            propItem.disable();
+                        }
+                    }
+                    var exportacionItem = toolbar.findItemByValue("exportar");
+                    if (exportacionItem) {
+                        if (exportarEnabled) {
+                            exportacionItem.enable();
+                        } else {
+                            exportacionItem.disable();
+                        }
+                    }
+                }
+            }
+            function CollapseAllGroupsAndExpandItem(grid, selectedItem) {
+                //Colapso todos los grupos
+                $.each($('#' + grid.ClientID).find('tr.rgGroupHeader 
+input.rgCollapse'), function () {
+                    $(this).click();
+                });
+                //Expando el grupo al que pertenece el elemento seleccionado
+                //var $row = $('#' + 
+grid.ClientID).find('tr.rgSelectedRow').first();
+                var $row = $(selectedItem.get_element());
+                ExpandParentGroupsOfRow($row);
+            }
+            function GetPrevRow($row) {
+                //Retorna la siguiente fila
+                var $prev = $row.prev();
+                while ($prev && $prev.length > 0) {
+                    if ($prev.hasClass('rgRow') || $prev.hasClass('rgAltRow')) {
+                        return $prev;
+                    } else {
+                        $prev = $prev.prev();
+                    }
+                }
+                return null;
+            }
+            function GetNextRow($row) {
+                //Retorna la siguiente fila
+                var $next = $row.next();
+                while ($next && $next.length > 0) {
+                    if ($next.hasClass('rgRow') || $next.hasClass('rgAltRow')) {
+                        return $next;
+                    } else {
+                        $next = $next.next();
+                    }
+                }
+                return null;
+            }
+            function ExpandParentGroupsOfRow($row) {
+                //Expande los grupos a los que pertenece la fila dada
+                var level = $row.find('.rgGroupCol').length + 1;
+                var groupsToExpand = [];
+                while ($row && $row.length > 0) {
+                    $row = GetParentGroup($row, level);
+                    if ($row) {
+                        $.each($row.find('input.rgExpand'), function () {
+                            $(this).click();
+                        });
+                        level = $row.find('.rgGroupCol').length;
+                    }
+                }
+            }
+            function GetParentGroup($row, level) {
+                var $prev = $row.prev();
+                while ($prev && $prev.length > 0) {
+                    if ($prev.hasClass('rgGroupHeader') && 
+$prev.find('.rgGroupCol').length == (level - 1)) {
+                        return $prev;
+                    } else {
+                        $prev = $prev.prev();
+                    }
+                }
+                return null;
+            }
+            function OnGridKeyPress(sender, eventArgs) {
+                if (radGridResultado_ChangingPage) {
+                    eventArgs.set_cancel(true);
+                    return;
+                };
+                if (eventArgs.get_keyCode() == 13) {
+                    eventArgs.set_cancel(true);
+                }
+            }
+            function AxentriaCI_LoadGuiState() {
+                PersistenciaGUI_LoadGuiState(
+                    "RadGridResultado",
+                    "RadSplitter",
+                    null,
+                    null,
+                    'splitterWidth'
+                );
+                //Solo ejecuto la inicializacion la primera vez
+                Sys.Application.remove_load(AxentriaCI_LoadGuiState);
+            }
+            function AxentriaCI_OnClientLoad() {
+                PersistenciaGUI_OnClientLoad(
+                    "RadGridResultado",
+                    "RadSplitter",
+                    null,
+                    null,
+                    'splitterWidth',
+                    null,
+                    OnSplitterResized
+                );
+            }
+            function OnSplitterResized(sender, eventArgs) {
+                var ajaxManager = $find("RadAjaxManager1");
+                ajaxManager.ajaxRequestWithTarget('persGUIPanel', '');
+            }
+            function OnGridColumnResized(sender, eventArgs) {
+                var ajaxManager = $find("RadAjaxManager1");
+                ajaxManager.ajaxRequestWithTarget('persGUIPanel', '');
+            }
+            function onDateFilterClick(sender) {
+                __doPostBack(sender.id.replace(new RegExp('_', 'g'), '$'), 
+"onDateFilterClick");
+            }
+            function onDateFilterPressKey(sender, eventArgs) {
+                if (eventArgs.get_keyCode() == 13) {
+                    eventArgs.set_cancel(true);
+                    var buttonId = 
+$(sender.get_element()).closest('.RadPicker').parent().find('input[type=button]').a
+ttr('id');
+                    //FIX: en IE no setea bien la fecha cuando se digita
+                    var dateFormat = sender.get_displayDateFormat();
+                    dateFormat = dateFormat.replace(/yy/g, "YY");
+                    dateFormat = dateFormat.replace(/dd/g, "DD");
+                    var dateValue = $(sender.get_element()).val().toString();
+                    var selectedDate = moment(dateValue, dateFormat);
+                    if (selectedDate.isValid()) {
+                        sender.set_selectedDate(selectedDate.toDate());
+                    } else {
+                        sender.set_selectedDate(null);
+                    }
+                    $('#' + buttonId).click();
+                }
+            }
+            function MostrarVersion(version, ultimaVersion) {
+                OcultarVersion();
+                if (version) {
+                    if (!ultimaVersion) {
+                        $('#divVersionDoc').show();
+                        $('#lblVersionDoc').html(version);
+                    } else {
+                        $('#divUltimaVersionDoc').show();
+                        $('#lblUltimaVersionDoc').html(version);
+                        
+                    }
+                }
+            }
+            function OcultarVersion() {
+                $('#divVersionDoc').hide();
+                $('#lblVersionDoc').html('');
+                $('#divUltimaVersionDoc').hide();
+                $('#lblUltimaVersionDoc').html('');
+            }
+        </script>
+        <script type="text/javascript">
+            function OnRadGridResultadoRowContextMenu(context, args) {
+                var ajaxManager = $find("RadAjaxManager1");
+                var menu = $find("RadContextMenuDocumento");
+                var grid = $find("RadGridResultado");
+                var evt = args.get_domEvent();
+                if (evt.target.tagName == "INPUT" || evt.target.tagName == "A") {
+                    return;
+                }
+                var index = args.get_itemIndexHierarchical();
+                var item = grid.get_masterTableView().get_dataItems()[index];
+                if (!item.get_selected()) {
+                    grid.get_masterTableView().clearSelectedItems();
+                    grid.get_masterTableView().selectItem(item.get_element(), 
+true);
+                }
+                if (grid.get_masterTableView()) {
+                    var items = grid.get_masterTableView().get_selectedItems();
+                    if (items.length == 0) {
+                        //No muestro el menú.
+                    } else if (items.length >= 1) {
+                        var exportarVisible = true;
+                        var propiedadesVisible = true;
+                        if (items.length > 1) {
+                            propiedadesVisible = false;
+                        }
+                        if (menu.findItemByValue("exportar")) {
+                            
+menu.findItemByValue("exportar").set_visible(exportarVisible);
+                        }
+                        if (menu.findItemByValue("propiedades")) {
+                            
+menu.findItemByValue("propiedades").set_visible(propiedadesVisible);
+                        }
+                        if (exportarVisible || propiedadesVisible) {
+                            menu.show(evt);
+                        }
+                    }
+                }
+                evt.cancelBubble = true;
+                evt.returnValue = false;
+                if (evt.stopPropagation) {
+                    evt.stopPropagation();
+                    evt.preventDefault();
+                }
+            }
+            function RadToolBar1ItemClicking(sender, args) {
+                var grid = $find("RadGridResultado");
+                switch (args.get_item().get_value()) {
+                    case "exportar":
+                        AbrirExportacion(grid);
+                        args.set_cancel(true);
+                        break;
+                    case "propiedades":
+                        AbrirPropiedades(grid);
+                        args.set_cancel(true);
+                        break;
+                }
+            }
+            function OnRadContextMenuDocumentoItemClicking(sender, args) {
+                var grid = $find("RadGridResultado");
+                switch (args.get_item().get_value()) {
+                    case "exportar":
+                        AbrirExportacion(grid);
+                        break;
+                    case "propiedades":
+                        AbrirPropiedades(grid);
+                        break;
+                }
+            }
+            function AbrirPropiedades(grid) {
+                var doid = "";
+                var dataItems = grid.get_masterTableView().get_selectedItems();
+                if (dataItems.length == 1) {
+                    doid = dataItems[0].getDataKeyValue("IdDocumento");
+                }
+                if (doid == "") {
+                    alert("No se han seleccionado elementos");
+                }
+                else {
+                    var ajaxPanel = $find("RadAjaxManager1");
+                    if (ajaxPanel != null) {
+                        ajaxPanel.ajaxRequest("propiedades:" + doid);
+                    }
+                }
+            }
+            function AbrirExportacion(grid) {
+                var documentos = "";
+                var dataItems = grid.get_masterTableView().get_selectedItems();
+                if (dataItems.length == 1) {
+                    documentos = dataItems[0].getDataKeyValue("IdDocumento") + ":" 
++ dataItems[0].getDataKeyValue("Nombre");
+                } else {
+                    for (var i = 0; i < dataItems.length; i++) {
+                        documentos = documentos + 
+dataItems[i].getDataKeyValue("IdDocumento") + "|";
+                    }
+                }
+                if (documentos == "") {
+                    alert("No se han seleccionado elementos");
+                }
+                else {
+                    var ajaxPanel = $find("RadAjaxManager1");
+                    if (ajaxPanel != null) {
+                        ajaxPanel.ajaxRequest("exportar:" + documentos);
+                    }
+                }
+            }
+            function ObtenerExportacion(params) {
+                var exportacionUrl = '/AxentriaCI/Paginas/Exportacion.aspx';
+                var url = exportacionUrl;
+                url = url + "?" + params;
+                AbrirURL(url);
+                $("#visor").css("display", "none");
+                var callBack = function (args) { $("#visor").css("display", 
+"inherit"); }
+                radalert('Exportación realizada con éxito', 330, 180, 
+'Información', callBack, "");
+                if (isIE() < 9) {
+                    $("#visor").css("display", "inherit");
+                }
+            }
+            function AbrirVentana(radWinId, url) {
+                var oWnd = $find(radWinId);
+                $("#visor").css("display", "none");
+                oWnd.SetUrl(url);
+                oWnd.Show();
+            }
+            function AbrirURL(url) {
+                var iframe = $('#Garino_Axentria_CI_IFrame');
+                if (iframe.length == 0) {
+                    iframe = $('<iframe name="Garino_Axentria_CI_IFrame" 
+id="Garino_Axentria_CI_IFrame" src="about:none" />');
+                    $('#Garino_Axentria_CI_IFrame_Container').append(iframe);
+                }
+                iframe.attr('src', url);
+            }
+            function OnWindowClose() {
+                $find('RadGridResultado').get_element().focus();
+                $("#visor").css("display", "inherit");
+            }
+            function isIE() {
+                var myNav = navigator.userAgent.toLocaleLowerCase();
+                //alert(myNav);
+                if (myNav.indexOf('trident/4.0') != -1)
+                    return 8;
+                else if (myNav.indexOf('trident/5.0') != -1)
+                    return 9;
+                else if (myNav.indexOf('trident/6.0') != -1)
+                    return 10;
+                else if (myNav.indexOf('trident/7.0') != -1)
+                    return 11;
+                else if (myNav.indexOf('edge') != -1)
+                    return 12;
+                else
+                    return 1;
+            }
+        </script>
+        <script type="text/javascript">
+            var currentLoadingPanel = null;
+            var currentUpdatedControl = null;
+            function RequestStart(sender, args) {
+                currentLoadingPanel = $find("RadAjaxLoading1");
+                currentUpdatedControl = "gridPanel";
+                //show the loading panel over the updated control
+                currentLoadingPanel.show(currentUpdatedControl);
+            }
+            function ResponseEnd() {
+                //hide the loading panel and clean up the global variables
+                if (currentLoadingPanel != null)
+                    currentLoadingPanel.hide(currentUpdatedControl);
+                currentUpdatedControl = null;
+                currentLoadingPanel = null;
+            }
+        </script>
+    
+    <style>
+        .rtbIcon
+        {
+            height: 15px;
+        }
+    </style>
+<link href="./Axentria CI_files/WebResource(2).axd" type="text/css" 
+rel="stylesheet" class="Telerik_stylesheet"><link href="./Axentria 
+CI_files/WebResource(3).axd" type="text/css" rel="stylesheet" 
+class="Telerik_stylesheet"><link href="./Axentria CI_files/WebResource(4).axd" 
+type="text/css" rel="stylesheet" class="Telerik_stylesheet"><link href="./Axentria 
+CI_files/WebResource(5).axd" type="text/css" rel="stylesheet" 
+class="Telerik_stylesheet"><link href="./Axentria CI_files/WebResource(6).axd" 
+type="text/css" rel="stylesheet" class="Telerik_stylesheet"><link href="./Axentria 
+CI_files/WebResource(7).axd" type="text/css" rel="stylesheet" 
+class="Telerik_stylesheet"><link href="./Axentria CI_files/WebResource(8).axd" 
+type="text/css" rel="stylesheet" class="Telerik_stylesheet"><link href="./Axentria 
+CI_files/WebResource(9).axd" type="text/css" rel="stylesheet" 
+class="Telerik_stylesheet"><link href="./Axentria CI_files/WebResource(10).axd" 
+type="text/css" rel="stylesheet" class="Telerik_stylesheet"><link href="./Axentria 
+CI_files/WebResource(11).axd" type="text/css" rel="stylesheet" 
+class="Telerik_stylesheet"><link href="./Axentria CI_files/WebResource(12).axd" 
+type="text/css" rel="stylesheet" class="Telerik_stylesheet"><link href="./Axentria 
+CI_files/WebResource(13).axd" type="text/css" rel="stylesheet" 
+class="Telerik_stylesheet"><link href="./Axentria CI_files/WebResource(14).axd" 
+type="text/css" rel="stylesheet" class="Telerik_stylesheet"><link href="./Axentria 
+CI_files/WebResource(15).axd" type="text/css" rel="stylesheet" 
+class="Telerik_stylesheet"><link href="./Axentria CI_files/WebResource(16).axd" 
+type="text/css" rel="stylesheet" class="Telerik_stylesheet"><link href="./Axentria 
+CI_files/WebResource(17).axd" type="text/css" rel="stylesheet" 
+class="Telerik_stylesheet"></head>
+<body style="margin: 0px; height: 100%; min-height: 100%; height: 100vh; 
+min-height: 100vh"><div style="display: none; position: absolute; background-color:
+rgb(255, 255, 255); opacity: 0; z-index: 1; cursor: w-resize; width: 133px; height:
+587px; left: 0px; top: 69px;"></div><div style="position: absolute; cursor: 
+w-resize; z-index: 2; left: -46px; top: 75px; display: none;" 
+class="RadSplitter"><div class="rspHelperBarDrag" style="cursor: w-resize; 
+font-size: 1px; margin: 0px 150px; width: 10px; height: 585px;"><!-- / --></div></div><div style="display: none; position: absolute; cursor: w-resize; 
+z-index: 2;" class="RadSplitter"><div class="rspHelperBarDrag" style="cursor: 
+w-resize; font-size: 1px; margin: 0px 150px;"><!-- / --></div></div>
+<form method="post" 
+action="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429L
+JZ2r9bZOEnqBr7flyo%2feAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg%2f+5kOIGCK
+%2fBUX5pEKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8Vq
+cB3dw6OQVf4qGWKCdQ=%3d" id="form1" style="width: 100%; height: 100%">
+<div class="aspNetHidden">
+<input type="hidden" name="RadScriptManager1_TSM" id="RadScriptManager1_TSM" 
+value=";;System.Web.Extensions, Version=4.0.0.0, Culture=neutral, 
+PublicKeyToken=31bf3856ad364e35:es-UY:a8328cc8-0a99-4e41-8fe3-b58afac64e45:ea597d4b
+:b25378d2;Telerik.Web.UI:es-UY:f5c550b9-a65b-4cfb-8f9c-9833432cbee6:16e4e7cd:f76455
+09:22a6274a:874f8ea2:24ee1bba:92fe8ea0:fa31b949:f46195d3:4877f69a:c128760b:19620875
+:490a9d4e:bd8f85e4:ed16cbdc:88144a7a:11a04f7e:1e771326:a7e79140:58366029:2003d0b8:a
+a288e2d:258f1c72:e330518b:c8618e41:e4f8f289:1a73651d:333f8d94:6d43f6d9">
+<input type="hidden" name="__EVENTTARGET" id="__EVENTTARGET" value="persGUIPanel">
+<input type="hidden" name="__EVENTARGUMENT" id="__EVENTARGUMENT" value="">
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" 
+value="/wEPDwULLTE5MTUzMzc1NDEPFhYeDEZpbHRyb3NYVGlwbzKHBgABAAAA/////wEAAAAAAAAADAIA
+AABNQ01JU0ludGVyb3AuRGF0YVR5cGVzLCBWZXJzaW9uPTguNS43LjQwLCBDdWx0dXJlPW5ldXRyYWwsIFB
+1YmxpY0tleVRva2VuPW51bGwEAQAAAKQBU3lzdGVtLkNvbGxlY3Rpb25zLkdlbmVyaWMuTGlzdGAxW1tDTU
+lTSW50ZXJvcC5EYXRhVHlwZXMuQXhlbnRyaWEuRmlsdHJvQnVzcVBvclRpcG8sIENNSVNJbnRlcm9wLkRhd
+GFUeXBlcywgVmVyc2lvbj04LjUuNy40MCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj1udWxs
+XV0DAAAABl9pdGVtcwVfc2l6ZQhfdmVyc2lvbgQAADJDTUlTSW50ZXJvcC5EYXRhVHlwZXMuQXhlbnRyaWE
+uRmlsdHJvQnVzcVBvclRpcG9bXQIAAAAICAkDAAAAAwAAAAMAAAAHAwAAAAABAAAABAAAAAQwQ01JU0ludG
+Vyb3AuRGF0YVR5cGVzLkF4ZW50cmlhLkZpbHRyb0J1c3FQb3JUaXBvAgAAAAkEAAAACQUAAAAJBgAAAAoFB
+AAAADBDTUlTSW50ZXJvcC5EYXRhVHlwZXMuQXhlbnRyaWEuRmlsdHJvQnVzcVBvclRpcG8FAAAAGjxjdF9u
+b21icmU+a19fQmFja2luZ0ZpZWxkFjxwaV9pZD5rX19CYWNraW5nRmllbGQWPGNtX2lkPmtfX0JhY2tpbmd
+GaWVsZBk8dmNfdmFsb3I+a19fQmFja2luZ0ZpZWxkGDxjbV9pZG1jPmtfX0JhY2tpbmdGaWVsZAEBAAEACQ
+gCAAAABgcAAAAGTnVtZXJvCuEFAAAAAAAABggAAAAGMzEyODkyAAAAAAEFAAAABAAAAAkHAAAAChUAAAAAA
+AAABgoAAAAFNTE1NzMAAAAAAQYAAAAEAAAABgsAAAAIQ2FyYWN0ZXIKhwAAAAAAAAAGDAAAAAo4MDAwNTk2
+Ni0yAAAAAAseF0FTUC5pbmRleF9hc3B4X0xzdE1haWxzMs0BAAEAAAD/////AQAAAAAAAAAEAQAAAH5TeXN
+0ZW0uQ29sbGVjdGlvbnMuR2VuZXJpYy5MaXN0YDFbW1N5c3RlbS5JbnQzMiwgbXNjb3JsaWIsIFZlcnNpb2
+49NC4wLjAuMCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj1iNzdhNWM1NjE5MzRlMDg5XV0DA
+AAABl9pdGVtcwVfc2l6ZQhfdmVyc2lvbgcAAAgICAkCAAAAAAAAAAAAAAAPAgAAAAAAAAAICx4PUGVybWlz
+b3NVc3VhcmlvMs4BAAEAAAD/////AQAAAAAAAAAMAgAAAEdBeGVudHJpYUNJLldlYjIsIFZlcnNpb249OC4
+1LjcuNDAsIEN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG9rZW49bnVsbAUBAAAAH0F4ZW50cmlhQ0kuV2
+ViMi5QZXJtaXNvc1VzdWFyaW8DAAAAEF9CdXNxdWVkYVBvclRpcG8RX0J1c3F1ZWRhQXZhbnphZGEMX0V4c
+G9ydGFjaW9uAAAACAgIAgAAAP///////////////wseDkZpbHRyb3NCYXNpY29zMqgDAAEAAAD/////AQAA
+AAAAAAAMAgAAAE1DTUlTSW50ZXJvcC5EYXRhVHlwZXMsIFZlcnNpb249OC41LjcuNDAsIEN1bHR1cmU9bmV
+1dHJhbCwgUHVibGljS2V5VG9rZW49bnVsbAQBAAAAnwFTeXN0ZW0uQ29sbGVjdGlvbnMuR2VuZXJpYy5MaX
+N0YDFbW0NNSVNJbnRlcm9wLkRhdGFUeXBlcy5BeGVudHJpYS5GaWx0cm9CYXNpY28sIENNSVNJbnRlcm9wL
+kRhdGFUeXBlcywgVmVyc2lvbj04LjUuNy40MCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj1u
+dWxsXV0DAAAABl9pdGVtcwVfc2l6ZQhfdmVyc2lvbgQAAC1DTUlTSW50ZXJvcC5EYXRhVHlwZXMuQXhlbnR
+yaWEuRmlsdHJvQmFzaWNvW10CAAAACAgJAwAAAAAAAAAAAAAABwMAAAAAAQAAAAAAAAAEK0NNSVNJbnRlcm
+9wLkRhdGFUeXBlcy5BeGVudHJpYS5GaWx0cm9CYXNpY28CAAAACx4OU29ydEV4cHJlc3Npb25lHgpQYXJhb
+WV0cm9zMvoSAAEAAAD/////AQAAAAAAAAAMAgAAAEdBeGVudHJpYUNJLldlYjIsIFZlcnNpb249OC41Ljcu
+NDAsIEN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG9rZW49bnVsbAUBAAAAHUF4ZW50cmlhQ0kuV2ViMi5
+QYXJhbWV0cm9zV2ViCQAAAAdVc3VhcmlvCFBhc3N3b3JkCUlkVGlwb0RvYwNVcmwGQ2FtcG9zCENvbHVtbm
+FzBU9yZGVuCkFncnVwYWNpb24NTW9zdHJhckhlYWRlcgEBAAEDAwMDAAiNAVN5c3RlbS5Db2xsZWN0aW9uc
+y5HZW5lcmljLkxpc3RgMVtbQXhlbnRyaWFDSS5XZWIyLlBhcmFtQ2FtcG9WYWxvciwgQXhlbnRyaWFDSS5X
+ZWIyLCBWZXJzaW9uPTguNS43LjQwLCBDdWx0dXJlPW5ldXRyYWwsIFB1YmxpY0tleVRva2VuPW51bGxdXYc
+BU3lzdGVtLkNvbGxlY3Rpb25zLkdlbmVyaWMuTGlzdGAxW1tBeGVudHJpYUNJLldlYjIuUGFyYW1ldHJvLC
+BBeGVudHJpYUNJLldlYjIsIFZlcnNpb249OC41LjcuNDAsIEN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5V
+G9rZW49bnVsbF1diAFTeXN0ZW0uQ29sbGVjdGlvbnMuR2VuZXJpYy5MaXN0YDFbW0F4ZW50cmlhQ0kuV2Vi
+Mi5QYXJhbU9yZGVuLCBBeGVudHJpYUNJLldlYjIsIFZlcnNpb249OC41LjcuNDAsIEN1bHR1cmU9bmV1dHJ
+hbCwgUHVibGljS2V5VG9rZW49bnVsbF1diAFTeXN0ZW0uQ29sbGVjdGlvbnMuR2VuZXJpYy5MaXN0YDFbW0
+F4ZW50cmlhQ0kuV2ViMi5QYXJhbU9yZGVuLCBBeGVudHJpYUNJLldlYjIsIFZlcnNpb249OC41LjcuNDAsI
+EN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG9rZW49bnVsbF1dAQIAAAAGAwAAABFBeGVudHJpYVRyYW5z
+ZkV4dAYEAAAACEl0YXUyMDIwygAAAAYFAAAAH2h0dHA6Ly9weWhtbHc0MTUvcG9ydGFsYXhlbnRyaWEJBgA
+AAAkHAAAACQgAAAAJCQAAAAEEBgAAAI0BU3lzdGVtLkNvbGxlY3Rpb25zLkdlbmVyaWMuTGlzdGAxW1tBeG
+VudHJpYUNJLldlYjIuUGFyYW1DYW1wb1ZhbG9yLCBBeGVudHJpYUNJLldlYjIsIFZlcnNpb249OC41LjcuN
+DAsIEN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG9rZW49bnVsbF1dAwAAAAZfaXRlbXMFX3NpemUIX3Zl
+cnNpb24EAAAhQXhlbnRyaWFDSS5XZWIyLlBhcmFtQ2FtcG9WYWxvcltdAgAAAAgICQoAAAADAAAAAwAAAAQ
+HAAAAhwFTeXN0ZW0uQ29sbGVjdGlvbnMuR2VuZXJpYy5MaXN0YDFbW0F4ZW50cmlhQ0kuV2ViMi5QYXJhbW
+V0cm8sIEF4ZW50cmlhQ0kuV2ViMiwgVmVyc2lvbj04LjUuNy40MCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsa
+WNLZXlUb2tlbj1udWxsXV0DAAAABl9pdGVtcwVfc2l6ZQhfdmVyc2lvbgQAABtBeGVudHJpYUNJLldlYjIu
+UGFyYW1ldHJvW10CAAAACAgJCwAAAAEAAAABAAAABAgAAACIAVN5c3RlbS5Db2xsZWN0aW9ucy5HZW5lcml
+jLkxpc3RgMVtbQXhlbnRyaWFDSS5XZWIyLlBhcmFtT3JkZW4sIEF4ZW50cmlhQ0kuV2ViMiwgVmVyc2lvbj
+04LjUuNy40MCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj1udWxsXV0DAAAABl9pdGVtcwVfc
+2l6ZQhfdmVyc2lvbgQAABxBeGVudHJpYUNJLldlYjIuUGFyYW1PcmRlbltdAgAAAAgICQwAAAAAAAAAAAAA
+AAEJAAAACAAAAAkMAAAAAAAAAAAAAAAHCgAAAAABAAAABAAAAAQfQXhlbnRyaWFDSS5XZWIyLlBhcmFtQ2F
+tcG9WYWxvcgIAAAAJDQAAAAkOAAAACQ8AAAAKBwsAAAAAAQAAAAQAAAAEGUF4ZW50cmlhQ0kuV2ViMi5QYX
+JhbWV0cm8CAAAACRAAAAANAwcMAAAAAAEAAAAAAAAABBpBeGVudHJpYUNJLldlYjIuUGFyYW1PcmRlbgIAA
+AAFDQAAAB9BeGVudHJpYUNJLldlYjIuUGFyYW1DYW1wb1ZhbG9yBAAAAAVDYW1wbwVWYWxvcghPcExvZ2lj
+bwxPcFJlbGFjaW9uYWwEAQEBGUF4ZW50cmlhQ0kuV2ViMi5QYXJhbWV0cm8CAAAAAgAAAAkRAAAABhIAAAA
+GMzEyODkyCgoBDgAAAA0AAAAJEwAAAAYUAAAABTUxNTczCgoBDwAAAA0AAAAJFQAAAAYWAAAACjgwMDA1OT
+Y2LTIKCgUQAAAAGUF4ZW50cmlhQ0kuV2ViMi5QYXJhbWV0cm8FAAAABk5vbWJyZQdJZENhbXBvBFRpcG8IV
+Glwb0RhdG8LRGlzcGxheU5hbWUBAAQEAQgdQXhlbnRyaWFDSS5XZWIyLlRpcG9QYXJhbWV0cm8CAAAAGEF4
+ZW50cmlhQ0kuV2ViMi5UaXBvRGF0bwIAAAACAAAABhcAAAAGbm9tYnJlAAAAAAXo////HUF4ZW50cmlhQ0k
+uV2ViMi5UaXBvUGFyYW1ldHJvAQAAAAd2YWx1ZV9fAAgCAAAAAQAAAAXn////GEF4ZW50cmlhQ0kuV2ViMi
+5UaXBvRGF0bwEAAAAHdmFsdWVfXwAIAgAAAAAAAAAGGgAAAAZOb21icmUBEQAAABAAAAAGGwAAAAxucm9vc
+GVyYWNpb27hBQAAAeT////o////AAAAAAHj////5////wIAAAAGHgAAAA1Ocm8gT3BlcmFjaW9uARMAAAAQ
+AAAABh8AAAAKbnJvY2xpZW50ZRUAAAAB4P///+j///8AAAAAAd/////n////AgAAAAYiAAAADk5ybyBkZSB
+DbGllbnRlARUAAAAQAAAABiMAAAADcnVjhwAAAAHc////6P///wAAAAAB2////+f///8AAAAABiYAAAAHUl
+VDIE7CugseFlJhZEdyaWRQZXJzaXN0ZW5jZUluaXRnHhBDaGVja1JlZGlyZWNjaW9uaB4JUGFnZUluZGV4Z
+h4MVGlwb0NvbnN1bHRhBQRUaXBvHghQYWdlU2l6ZQIUFgICBA9kFggCAw8UKwACFCsAAw8WCB4SUmVzb2x2
+ZWRSZW5kZXJNb2RlCylyVGVsZXJpay5XZWIuVUkuUmVuZGVyTW9kZSwgVGVsZXJpay5XZWIuVUksIFZlcnN
+pb249MjAxNS4xLjQwMS40MCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj0xMjFmYWU3ODE2NW
+JhM2Q0AR4VRW5hYmxlRW1iZWRkZWRTY3JpcHRzZx4cRW5hYmxlRW1iZWRkZWRCYXNlU3R5bGVzaGVldGceF
+0VuYWJsZUFqYXhTa2luUmVuZGVyaW5naGRkZBAWAmYCARYCFCsAAw8WCB8OaB8MZx8LCysEAR8NZ2RkZBQr
+AAMPFggfDmgfDGcfCwsrBAEfDWdkZGQPFgJmZhYBBXFUZWxlcmlrLldlYi5VSS5SYWRXaW5kb3csIFRlbGV
+yaWsuV2ViLlVJLCBWZXJzaW9uPTIwMTUuMS40MDEuNDAsIEN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG
+9rZW49MTIxZmFlNzgxNjViYTNkNBYEZg8UKwADDxYIHw5oHwxnHwsLKwQBHw1nZGRkZAIBDxQrAAMPFggfD
+mgfDGcfCwsrBAEfDWdkZGRkAgcPDxYCHw5oZGQCCw9kFgQCAQ8PFgIeBFRleHQFDkNlcnJhciBzZXNpw7Nu
+ZGQCAw8WAh4JaW5uZXJodG1sBRFBeGVudHJpYVRyYW5zZkV4dGQCDQ8PFgQeBkhlaWdodBsAAAAAAIBWQAc
+AAAAeBF8hU0ICgAFkFgICAQ8PFggfDGcfDWcfCwsrBAEfDmhkFgZmDw8WBh8OaB8MZx8LCysEAWQWAgIBD2
+QWBgIBDxQrAAIPFggfDGcfDWcfCwsrBAEfDmhkEBYDZgIBAgIWAxQrAAIPFgIeB1Rvb2xUaXAFDUV4cG9yd
+GFyIHRvZG9kZBQrAAIPFgIfEwUIRXhwb3J0YXJkZBQrAAIPFgIfEwULUHJvcGllZGFkZXNkZA8WA2ZmZhYB
+BXhUZWxlcmlrLldlYi5VSS5SYWRUb29sQmFyQnV0dG9uLCBUZWxlcmlrLldlYi5VSSwgVmVyc2lvbj0yMDE
+1LjEuNDAxLjQwLCBDdWx0dXJlPW5ldXRyYWwsIFB1YmxpY0tleVRva2VuPTEyMWZhZTc4MTY1YmEzZDQWBm
+YPDxYCHxMFDUV4cG9ydGFyIHRvZG9kZAIBDw8WAh8TBQhFeHBvcnRhcmRkAgIPDxYCHxMFC1Byb3BpZWRhZ
+GVzZGQCAw88KwAOAgAUKwACDxYOHgtfIUl0ZW1Db3VudAIBHw1nHgtfIURhdGFCb3VuZGcfDGceGmNzX2V2
+ZW50c19PblJvd0NvbnRleHRNZW51BSBPblJhZEdyaWRSZXN1bHRhZG9Sb3dDb250ZXh0TWVudR8OaB8LCys
+EAWQXBAUTU2VsZWN0ZWRDZWxsSW5kZXhlcxYABQ9TZWxlY3RlZEluZGV4ZXMWAAULRWRpdEluZGV4ZXMWAA
+UIUGFnZVNpemUCFAEWAhYLDwIBFCsAAhQrAAVkZBYEHgVXaWR0aBsAAAAAAIBRQAEAAAAfEgKAAmQFC2lkZ
+G9jdW1lbnRvDwUPR3JpZEJvdW5kQ29sdW1uFCsABRYcHgNfYWZnHgZfYXBib2ZnHgRfZmN3GwAAAAAAwFJA
+BwAAAB4JR3JvdXBhYmxlZx4EX2diZQUWbm9tYnJlIEdyb3VwIEJ5IG5vbWJyZR4JUmVzaXphYmxlZx4HVml
+zaWJsZWceA19zZQUGbm9tYnJlHgpIZWFkZXJUZXh0BQZOb21icmUeCURhdGFGaWVsZAUGbm9tYnJlHgtSZW
+9yZGVyYWJsZWgeCERhdGFUeXBlGSsCHg1IZWFkZXJUb29sdGlwBQZOb21icmUeBG9pbmQCAxYEHgRXcmFwa
+B8SAoCAEBYGHyZoHxcbAAAAAADAYkABAAAAHxICgIIQZAUGbm9tYnJlZGUUKwAACyl5VGVsZXJpay5XZWIu
+VUkuR3JpZENoaWxkTG9hZE1vZGUsIFRlbGVyaWsuV2ViLlVJLCBWZXJzaW9uPTIwMTUuMS40MDEuNDAsIEN
+1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG9rZW49MTIxZmFlNzgxNjViYTNkNAE8KwAHAAspdFRlbGVyaW
+suV2ViLlVJLkdyaWRFZGl0TW9kZSwgVGVsZXJpay5XZWIuVUksIFZlcnNpb249MjAxNS4xLjQwMS40MCwgQ
+3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj0xMjFmYWU3ODE2NWJhM2Q0ARYCHgRfZWZzFgIeBF9l
+Y2NkZBYSHghfcmFkbm1ydAUgTm8gaGF5ICBkb2N1bWVudG9zIHBhcmEgbW9zdHJhci4eFElzQm91bmRUb0Z
+vcndhcmRPbmx5aB8UAgIeCF9yYWRuZHJ0BSBObyBoYXkgIGRvY3VtZW50b3MgcGFyYSBtb3N0cmFyLh8VZx
+4EX3ZpYwICHghEYXRhS2V5cxYAHgVfIUNJUxcAHgxfaXNmbHRyaXRtZXhnZGYWBmYPFCsAAw8WAh8eZxYCH
+gVzdHlsZQULd2lkdGg6MTAwJTtkZGQCAQ8WBRQrAAIPFhIfKQUgTm8gaGF5ICBkb2N1bWVudG9zIHBhcmEg
+bW9zdHJhci4fKmgfFAICHysFIE5vIGhheSAgZG9jdW1lbnRvcyBwYXJhIG1vc3RyYXIuHxVnHywCAh8tFgA
+fLhcAHy9nZBcEBQZfIURTSUMCAgULXyFJdGVtQ291bnQCAgUQQ3VycmVudFBhZ2VJbmRleGYFCF8hUENvdW
+50AgEWAh8fFgIeAl9jZhQrAAIUKwACFCsABQUHVmVyc2lvbgUDVXJsBQtJZERvY3VtZW50bwUGTm9tYnJlB
+QtGaXJtYVZhbGlkYRQrAAUCAQXLA2h0dHA6Ly9weWhtbHc0MTIuaW50ZXJiYW5jby5jb20ucHkvV2ViSW1h
+Z2VuZXMvVmlzb3JEb2N1Vmlld2VyLmFzcHg/ZHVtbXk9NjM5MTUzMDc2MTk0NjkyNTQ4JmlkZG9jdW1lbnR
+vPTEwODE4NTY2JmlkdmVyc2lvbj0xJmlkdXN1YXJpbz0yMzA3JmluaWNueHRpY2tzPTYzOTE1MzA3NjE1MD
+AwMDAwMCZjYW50aWRhZHBhZ2luYXM9MCZub21icmVEb2N1bWVudG89MzEyODkyX3RyYXNuZmVyX3BkZjUyM
+zUwLnBkZiZ0ZXh0b01hcmNhRGVBZ3VhPSZjb2xvck1hcmNhRGVBZ3VhPSZpbXByaW1pck1hcmNhRGVBZ3Vh
+PUZhbHNlJm1vc3RyYXJNYXJjYURlQWd1YT1GYWxzZSZwb3NpY2lvbk1hcmNhRGVBZ3VhPTAmdmVyc2lvbmF
+kb0xpY2VuY2lhZG89VHJ1ZSZyb2xJbXByZXNpb249MSZyb2xFeHBvcnRhY2lvbj0xJm9wZXJhY2lvbj1sZW
+N0dXJhJmV4dGVuc2lvbj0ucGRmJmR1bW15PTYzOTE1MzA3NjE5NDY5MjU0OCgpWVN5c3RlbS5JbnQ2NCwgb
+XNjb3JsaWIsIFZlcnNpb249NC4wLjAuMCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj1iNzdh
+NWM1NjE5MzRlMDg5CDEwODE4NTY2BRwzMTI4OTJfdHJhc25mZXJfcGRmNTIzNTAucGRmZxQrAAIUKwAFBQd
+WZXJzaW9uBQNVcmwFC0lkRG9jdW1lbnRvBQZOb21icmUFC0Zpcm1hVmFsaWRhFCsABQIBBeoDaHR0cDovL3
+B5aG1sdzQxMi5pbnRlcmJhbmNvLmNvbS5weS9XZWJJbWFnZW5lcy9WaXNvckRvY3VWaWV3ZXIuYXNweD9kd
+W1teT02MzkxNTMwNzYxOTQ2OTI1NDgmaWRkb2N1bWVudG89MTA4MTg1NjUmaWR2ZXJzaW9uPTEmaWR1c3Vh
+cmlvPTIzMDcmaW5pY254dGlja3M9NjM5MTUzMDc2MTUwMDAwMDAwJmNhbnRpZGFkcGFnaW5hcz0wJm5vbWJ
+yZURvY3VtZW50bz0zMTI4OTJfMzEyNzk2X1Byb3llY3Rvc19jbG91ZF9hd3NfcGRmNTIzNTBfXzJfX3BkZj
+UyMzUwLnBkZiZ0ZXh0b01hcmNhRGVBZ3VhPSZjb2xvck1hcmNhRGVBZ3VhPSZpbXByaW1pck1hcmNhRGVBZ
+3VhPUZhbHNlJm1vc3RyYXJNYXJjYURlQWd1YT1GYWxzZSZwb3NpY2lvbk1hcmNhRGVBZ3VhPTAmdmVyc2lv
+bmFkb0xpY2VuY2lhZG89VHJ1ZSZyb2xJbXByZXNpb249MSZyb2xFeHBvcnRhY2lvbj0xJm9wZXJhY2lvbj1
+sZWN0dXJhJmV4dGVuc2lvbj0ucGRmJmR1bW15PTYzOTE1MzA3NjE5NDY5MjU0OCgrBwgxMDgxODU2NQU7Mz
+EyODkyXzMxMjc5Nl9Qcm95ZWN0b3NfY2xvdWRfYXdzX3BkZjUyMzUwX18yX19wZGY1MjM1MC5wZGZnFgJkZ
+BYCZ2cWAmYPZBYMZg9kFgZmDw8WBh4IQ3NzQ2xhc3MFCCByZ1BhZ2VyHxICAh8eaGQWAmYPDxYCHgpDb2x1
+bW5TcGFuAgFkFgJmD2QWAgIBD2QWAgIBD2QWBmYPZBYEZg8PFgIeEVVzZVN1Ym1pdEJlaGF2aW9yaGRkAgI
+PDxYCHzRoZGQCAg9kFgRmDw8WAh80aGRkAgMPDxYCHzRoZGQCAw8PFgQfMgUQcmdXcmFwIHJnQWR2UGFydB
+8SAgJkFgICAQ8UKwACDxYcHhlSZWdpc3RlcldpdGhTY3JpcHRNYW5hZ2VyZx4MVGFibGVTdW1tYXJ5ZR8MZ
+x8XGwAAAAAAAEdAAQAAAB8NZx4MVGFibGVDYXB0aW9uBRBQYWdlU2l6ZUNvbWJvQm94HxICgAIeCklucHV0
+VGl0bGVlHhNFbmFibGVFbWJlZGRlZFNraW5zZx4dT25DbGllbnRTZWxlY3RlZEluZGV4Q2hhbmdpbmcFMFR
+lbGVyaWsuV2ViLlVJLkdyaWQuQ2hhbmdpbmdQYWdlU2l6ZUNvbWJvSGFuZGxlch4TY2FjaGVkU2VsZWN0ZW
+RWYWx1ZWQfFWceEUVuYWJsZUFyaWFTdXBwb3J0aB4cT25DbGllbnRTZWxlY3RlZEluZGV4Q2hhbmdlZAUuV
+GVsZXJpay5XZWIuVUkuR3JpZC5DaGFuZ2VQYWdlU2l6ZUNvbWJvSGFuZGxlcmQPFCsABRQrAAIPFgYfDwUC
+MTAeBVZhbHVlBQIxMB4IU2VsZWN0ZWRoFgIeEG93bmVyVGFibGVWaWV3SWQFFlJhZEdyaWRSZXN1bHRhZG9
+fY3RsMDBkFCsAAg8WBh8PBQIyMB8+BQIyMB8/ZxYCH0AFFlJhZEdyaWRSZXN1bHRhZG9fY3RsMDBkFCsAAg
+8WBh8PBQI1MB8+BQI1MB8/aBYCH0AFFlJhZEdyaWRSZXN1bHRhZG9fY3RsMDBkFCsAAg8WBh8PBQMxMDAfP
+gUDMTAwHz9oFgIfQAUWUmFkR3JpZFJlc3VsdGFkb19jdGwwMGQUKwACDxYGHw8FAzIwMB8+BQMyMDAfP2gW
+Ah9ABRZSYWRHcmlkUmVzdWx0YWRvX2N0bDAwZA8UKwEFZmZmZmYWAQV3VGVsZXJpay5XZWIuVUkuUmFkQ29
+tYm9Cb3hJdGVtLCBUZWxlcmlrLldlYi5VSSwgVmVyc2lvbj0yMDE1LjEuNDAxLjQwLCBDdWx0dXJlPW5ldX
+RyYWwsIFB1YmxpY0tleVRva2VuPTEyMWZhZTc4MTY1YmEzZDQWDmYPDxYEHzIFCXJjYkhlYWRlch8SAgJkZ
+AIBDw8WBB8yBQlyY2JGb290ZXIfEgICZGQCAg8PFgYfDwUCMTAfPgUCMTAfP2gWAh9ABRZSYWRHcmlkUmVz
+dWx0YWRvX2N0bDAwZAIDDw8WBh8PBQIyMB8+BQIyMB8/ZxYCH0AFFlJhZEdyaWRSZXN1bHRhZG9fY3RsMDB
+kAgQPDxYGHw8FAjUwHz4FAjUwHz9oFgIfQAUWUmFkR3JpZFJlc3VsdGFkb19jdGwwMGQCBQ8PFgYfDwUDMT
+AwHz4FAzEwMB8/aBYCH0AFFlJhZEdyaWRSZXN1bHRhZG9fY3RsMDBkAgYPDxYGHw8FAzIwMB8+BQMyMDAfP
+2gWAh9ABRZSYWRHcmlkUmVzdWx0YWRvX2N0bDAwZAIBD2QWCGYPDxYEHw8FBiZuYnNwOx8eaGRkAgEPDxYE
+Hw8FBiZuYnNwOx8eaGRkAgIPDxYEHxMFD0lkIGRlIERvY3VtZW50bx8eaGRkAgMPDxYCHxMFBk5vbWJyZWR
+kAgIPZBYIZg8PFgQfDwUGJm5ic3A7Hx5oZGQCAQ8PFgQfDwUGJm5ic3A7Hx5oZGQCAg8PFgIfHmgWAh8wBR
+N3aGl0ZS1zcGFjZTpub3dyYXA7FgRmDxQrAAI8KwAIAQAPFiIeD1Nob3dTcGluQnV0dG9uc2gfE2UeGmluc
+HV0X2Zvcm1hdF9BbGxvd1JvdW5kaW5naB85Zx4ITWF4VmFsdWUHAAAAAAAA0EIfIxkpWlN5c3RlbS5Eb3Vi
+bGUsIG1zY29ybGliLCBWZXJzaW9uPTQuMC4wLjAsIEN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG9rZW4
+9Yjc3YTVjNTYxOTM0ZTA4OR4XaW5wdXRfZXZlbnRzX09uS2V5UHJlc3MFN1RlbGVyaWsuV2ViLlVJLlJhZE
+lucHV0Q29udHJvbC5DYW5jZWxSYXdFdmVudE9uRW50ZXJLZXkfFxsAAAAAAMBSQAcAAAAeBFR5cGULKXNUZ
+WxlcmlrLldlYi5VSS5OdW1lcmljVHlwZSwgVGVsZXJpay5XZWIuVUksIFZlcnNpb249MjAxNS4xLjQwMS40
+MCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj0xMjFmYWU3ODE2NWJhM2Q0AB4aaW5wdXRfZm9
+ybWF0X0RlY2ltYWxEaWdpdHMCAh8PZB4NRGJWYWx1ZUZhY3RvcgcAAAAAAADwPx4gaW5wdXRfZm9ybWF0X0
+tlZXBOb3RSb3VuZGVkVmFsdWVoHhpBbGxvd091dE9mUmFuZ2VBdXRvQ29ycmVjdGceCE1pblZhbHVlBwAAA
+AAAANDCHzxoHxICgAIWAh4DYWx0BRlGaWx0ZXIgaWRkb2N1bWVudG8gY29sdW1uZGQCAQ8PFgIfNGhkZAID
+Dw9kFgIfMAUTd2hpdGUtc3BhY2U6bm93cmFwOxYEZg8PZBYEHghvbmNoYW5nZQVyJGZpbmQoIlJhZEdyaWR
+SZXN1bHRhZG9fY3RsMDAiKS5fZmlsdGVyTm9EZWxheSgiUmFkR3JpZFJlc3VsdGFkb19jdGwwMF9jdGwwMl
+9jdGwwMl9GaWx0ZXJUZXh0Qm94X25vbWJyZSIsIm5vbWJyZSIpHgpvbmtleXByZXNzBZ4CaWYoZXZlbnQua
+2V5Q29kZSA9PSAxMyl7IHRoaXMuYmx1cigpOyBldmVudC5jYW5jZWxCdWJibGUgPSB0cnVlOyBldmVudC5y
+ZXR1cm5WYWx1ZSA9IGZhbHNlOyBpZiAoZXZlbnQuc3RvcFByb3BhZ2F0aW9uKXsgZXZlbnQuc3RvcFByb3B
+hZ2F0aW9uKCk7IGV2ZW50LnByZXZlbnREZWZhdWx0KCk7fSAkZmluZCgiUmFkR3JpZFJlc3VsdGFkb19jdG
+wwMCIpLl9maWx0ZXJOb0RlbGF5KCJSYWRHcmlkUmVzdWx0YWRvX2N0bDAwX2N0bDAyX2N0bDAyX0ZpbHRlc
+lRleHRCb3hfbm9tYnJlIiwibm9tYnJlIikgfWQCAQ8PFgIfNGhkZAIBD2QWBGYPZBYIZg8PFgQfDwUGJm5i
+c3A7Hx5oZGQCAQ8PFgQfDwUGJm5ic3A7Hx5oZGQCAg8PFgQfDwUGJm5ic3A7Hx5oZGQCAw8PFgIfDwUGJm5
+ic3A7ZGQCAQ8PFgQfMgUIIHJnUGFnZXIfEgICZBYCZg8PFgIfMwIBZBYCZg9kFgICAQ9kFgICAQ9kFgZmD2
+QWBGYPDxYCHzRoZGQCAg8PFgIfNGhkZAICD2QWBGYPDxYCHzRoZGQCAw8PFgIfNGhkZAIDDw8WBB8yBRByZ
+1dyYXAgcmdBZHZQYXJ0HxICAmQWAgIBDxQrAAIPFiQfOGUfPQUuVGVsZXJpay5XZWIuVUkuR3JpZC5DaGFu
+Z2VQYWdlU2l6ZUNvbWJvSGFuZGxlch8OaB85Zx8MZx8XGwAAAAAAAEdAAQAAAB8LCysEAR87ZB8PBQIyMB8
+NZx8VZx82ZR86BTBUZWxlcmlrLldlYi5VSS5HcmlkLkNoYW5naW5nUGFnZVNpemVDb21ib0hhbmRsZXIfNw
+UQUGFnZVNpemVDb21ib0JveB4EU2tpbgUFTWV0cm8fNWcfPGgfEgKAAmQPFCsABRQrAAIPFgYfDwUCMTAfP
+gUCMTAfP2gWAh9ABRZSYWRHcmlkUmVzdWx0YWRvX2N0bDAwZBQrAAIPFgYfDwUCMjAfPgUCMjAfP2cWAh9A
+BRZSYWRHcmlkUmVzdWx0YWRvX2N0bDAwZBQrAAIPFgYfDwUCNTAfPgUCNTAfP2gWAh9ABRZSYWRHcmlkUmV
+zdWx0YWRvX2N0bDAwZBQrAAIPFgYfDwUDMTAwHz4FAzEwMB8/aBYCH0AFFlJhZEdyaWRSZXN1bHRhZG9fY3
+RsMDBkFCsAAg8WBh8PBQMyMDAfPgUDMjAwHz9oFgIfQAUWUmFkR3JpZFJlc3VsdGFkb19jdGwwMGQPFCsBB
+WZmZmZmFgEFd1RlbGVyaWsuV2ViLlVJLlJhZENvbWJvQm94SXRlbSwgVGVsZXJpay5XZWIuVUksIFZlcnNp
+b249MjAxNS4xLjQwMS40MCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj0xMjFmYWU3ODE2NWJ
+hM2Q0Fg5mDw8WBB8yBQlyY2JIZWFkZXIfEgICZGQCAQ8PFgQfMgUJcmNiRm9vdGVyHxICAmRkAgIPDxYGHw
+8FAjEwHz4FAjEwHz9oFgIfQAUWUmFkR3JpZFJlc3VsdGFkb19jdGwwMGQCAw8PFgYfDwUCMjAfPgUCMjAfP
+2cWAh9ABRZSYWRHcmlkUmVzdWx0YWRvX2N0bDAwZAIEDw8WBh8PBQI1MB8+BQI1MB8/aBYCH0AFFlJhZEdy
+aWRSZXN1bHRhZG9fY3RsMDBkAgUPDxYGHw8FAzEwMB8+BQMxMDAfP2gWAh9ABRZSYWRHcmlkUmVzdWx0YWR
+vX2N0bDAwZAIGDw8WBh8PBQMyMDAfPgUDMjAwHz9oFgIfQAUWUmFkR3JpZFJlc3VsdGFkb19jdGwwMGQCAg
+8PFgIeBF9paWgFATBkFghmDw8WAh8eaGQWAmYPDxYCHzRoZGQCAQ8PFgQfDwUGJm5ic3A7Hx5oZGQCAg8PF
+gQfDwUGJm5ic3A7Hx5oZGQCAw8PFgIfDwUcMzEyODkyX3RyYXNuZmVyX3BkZjUyMzUwLnBkZmRkAgMPZBYC
+Zg8PFgIfHmhkZAIEDw8WAh9PBQExZBYIZg8PFgIfHmhkFgJmDw8WAh80aGRkAgEPDxYEHw8FBiZuYnNwOx8
+eaGRkAgIPDxYEHw8FBiZuYnNwOx8eaGRkAgMPDxYCHw8FOzMxMjg5Ml8zMTI3OTZfUHJveWVjdG9zX2Nsb3
+VkX2F3c19wZGY1MjM1MF9fMl9fcGRmNTIzNTAucGRmZGQCBQ9kFgJmDw8WAh8eaGRkAgIPFCsAAhQrAAIUK
+wACDxYKHw1nHwsLKwQBH04FBU1ldHJvHw5oHwxnZBAWEmYCAQICAgMCBAIFAgYCBwIIAgkCCgILAgwCDQIO
+Ag8CEAIRFhIUKwACD2QWBB4QY29sdW1uVW5pcXVlTmFtZWUeB3RhYmxlSURlZBQrAAIPZBYEH1BlH1FlZBQ
+rAAIPZBYEH1BlH1FlZBQrAAIPZBYEH1BlH1FlZBQrAAIPZBYEH1BlH1FlZBQrAAIPZBYEH1BlH1FlZBQrAA
+IPZBYEH1BlH1FlZBQrAAIPZBYEH1BlH1FlZBQrAAIPZBYEH1BlH1FlZBQrAAIPZBYEH1BlH1FlZBQrAAIPZ
+BYEH1BlH1FlZBQrAAIPZBYEH1BlH1FlZBQrAAIPZBYEH1BlH1FlZBQrAAIPZBYEH1BlH1FlZBQrAAIPZBYE
+H1BlH1FlZBQrAAIPZBYEH1BlH1FlZBQrAAIPZBYEH1BlH1FlZBQrAAIPZBYEH1BlH1FlZA8WEmZmZmZmZmZ
+mZmZmZmZmZmZmZhYBBXNUZWxlcmlrLldlYi5VSS5SYWRNZW51SXRlbSwgVGVsZXJpay5XZWIuVUksIFZlcn
+Npb249MjAxNS4xLjQwMS40MCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj0xMjFmYWU3ODE2N
+WJhM2Q0ZGQWJGYPD2QWBB9QZR9RZWQCAQ8PZBYEH1BlH1FlZAICDw9kFgQfUGUfUWVkAgMPD2QWBB9QZR9R
+ZWQCBA8PZBYEH1BlH1FlZAIFDw9kFgQfUGUfUWVkAgYPD2QWBB9QZR9RZWQCBw8PZBYEH1BlH1FlZAIIDw9
+kFgQfUGUfUWVkAgkPD2QWBB9QZR9RZWQCCg8PZBYEH1BlH1FlZAILDw9kFgQfUGUfUWVkAgwPD2QWBB9QZR
+9RZWQCDQ8PZBYEH1BlH1FlZAIODw9kFgQfUGUfUWVkAg8PD2QWBB9QZR9RZWQCEA8PZBYEH1BlH1FlZAIRD
+w9kFgQfUGUfUWVkAgUPFCsAAhQrAAIUKwACDxYKHhRPbkNsaWVudEl0ZW1DbGlja2luZwUlT25SYWRDb250
+ZXh0TWVudURvY3VtZW50b0l0ZW1DbGlja2luZx8MZx8NZx8LCysEAR8OaGQQFgJmAgEWAhQrAAIPFgIfDwU
+IRXhwb3J0YXJkZBQrAAIPFgIfDwULUHJvcGllZGFkZXNkZA8WAmZmFgEFc1RlbGVyaWsuV2ViLlVJLlJhZE
+1lbnVJdGVtLCBUZWxlcmlrLldlYi5VSSwgVmVyc2lvbj0yMDE1LjEuNDAxLjQwLCBDdWx0dXJlPW5ldXRyY
+WwsIFB1YmxpY0tleVRva2VuPTEyMWZhZTc4MTY1YmEzZDRkZBYEZg8PFgIfDwUIRXhwb3J0YXJkZAIBDw8W
+Ah8PBQtQcm9waWVkYWRlc2RkAgEPFCsAAg8WBh8OaB8MZx8LCysEAWRkZAICDw8WBh8OaB8MZx8LCysEAWQ
+WAgIBD2QWAgIDDzwrAAQBAA8WCB8MZx8NZx8LCysEAR8OaGRkGAMFHl9fQ29udHJvbHNSZXF1aXJlUG9zdE
+JhY2tLZXlfXxYNBRFSYWRXaW5kb3dNYW5hZ2VyMQUUUmFkV2luZG93RXhwb3J0YWNpb24FFFJhZFdpbmRvd
+1Byb3BpZWRhZGVzBQtSYWRTcGxpdHRlcgUIUmFkUGFuZTEFC1JhZFRvb2xCYXIxBRBSYWRHcmlkUmVzdWx0
+YWRvBTNSYWRHcmlkUmVzdWx0YWRvJGN0bDAwJGN0bDAzJGN0bDAxJFBhZ2VTaXplQ29tYm9Cb3gFGVJhZEd
+yaWRSZXN1bHRhZG8kcmZsdE1lbnUFF1JhZENvbnRleHRNZW51RG9jdW1lbnRvBRJSYWRTcGxpdEJhclBvcl
+RpcG8FCFJhZFBhbmUyBQhidG5WaXNvcgUzUmFkR3JpZFJlc3VsdGFkbyRjdGwwMCRjdGwwMyRjdGwwMSRQY
+WdlU2l6ZUNvbWJvQm94DxQrAAIFAjIwBQIyMGQFM1JhZEdyaWRSZXN1bHRhZG8kY3RsMDAkY3RsMDIkY3Rs
+MDAkUGFnZVNpemVDb21ib0JveA8UKwACZQUCMjBkr6C/2ClIn2Rl9mX/qxbYNo2z2cV/zIcFAVG/qIlfOsU
+=">
+</div>
+<script type="text/javascript">
+//<![CDATA[
+var theForm = document.forms['form1'];
+if (!theForm) {
+theForm = document.form1;
+}
+function __doPostBack(eventTarget, eventArgument) {
+if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+theForm.__EVENTTARGET.value = eventTarget;
+theForm.__EVENTARGUMENT.value = eventArgument;
+theForm.submit();
+}
+}
+//]]>
+</script>
+<script src="./Axentria CI_files/WebResource(18).axd" 
+type="text/javascript"></script>
+<script src="./Axentria CI_files/Telerik.Web.UI.WebResource.axd" 
+type="text/javascript"></script>
+<script type="text/javascript">
+//<![CDATA[
+var PageMethods = function() {
+PageMethods.initializeBase(this);
+this._timeout = 0;
+this._userContext = null;
+this._succeeded = null;
+this._failed = null;
+}
+PageMethods.prototype = {
+_get_path:function() {
+var p = this.get_path();
+if (p) return p;
+else return PageMethods._staticInstance.get_path();},
+GenerarSuceso:function(idTipoSuc,idDoc,succeededCallback, failedCallback, 
+userContext) {
+return this._invoke(this._get_path(), 
+'GenerarSuceso',false,{idTipoSuc:idTipoSuc,idDoc:idDoc},succeededCallback,failedCal
+lback,userContext); }}
+PageMethods.registerClass('PageMethods',Sys.Net.WebServiceProxy);
+PageMethods._staticInstance = new PageMethods();
+PageMethods.set_path = function(value) { 
+PageMethods._staticInstance.set_path(value); }
+PageMethods.get_path = function() { return PageMethods._staticInstance.get_path(); 
+}
+PageMethods.set_timeout = function(value) { 
+PageMethods._staticInstance.set_timeout(value); }
+PageMethods.get_timeout = function() { return 
+PageMethods._staticInstance.get_timeout(); }
+PageMethods.set_defaultUserContext = function(value) { 
+PageMethods._staticInstance.set_defaultUserContext(value); }
+PageMethods.get_defaultUserContext = function() { return 
+PageMethods._staticInstance.get_defaultUserContext(); }
+PageMethods.set_defaultSucceededCallback = function(value) { 
+PageMethods._staticInstance.set_defaultSucceededCallback(value); }
+PageMethods.get_defaultSucceededCallback = function() { return 
+PageMethods._staticInstance.get_defaultSucceededCallback(); }
+PageMethods.set_defaultFailedCallback = function(value) { 
+PageMethods._staticInstance.set_defaultFailedCallback(value); }
+PageMethods.get_defaultFailedCallback = function() { return 
+PageMethods._staticInstance.get_defaultFailedCallback(); }
+PageMethods.set_enableJsonp = function(value) { 
+PageMethods._staticInstance.set_enableJsonp(value); }
+PageMethods.get_enableJsonp = function() { return 
+PageMethods._staticInstance.get_enableJsonp(); }
+PageMethods.set_jsonpCallbackParameter = function(value) { 
+PageMethods._staticInstance.set_jsonpCallbackParameter(value); }
+PageMethods.get_jsonpCallbackParameter = function() { return 
+PageMethods._staticInstance.get_jsonpCallbackParameter(); }
+PageMethods.set_path("index.aspx");
+PageMethods.GenerarSuceso= function(idTipoSuc,idDoc,onSuccess,onFailed,userContext)
+{PageMethods._staticInstance.GenerarSuceso(idTipoSuc,idDoc,onSuccess,onFailed,userC
+ontext); }
+//]]>
+</script>
+<div class="aspNetHidden">
+<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" 
+value="6578C0ED">
+</div>
+<script type="text/javascript">
+//<![CDATA[
+Sys.WebForms.PageRequestManager._initialize('RadScriptManager1', 'form1', 
+['tRadAjaxPanelGridPanel','','tRadAjaxPanel1Panel','','tpersGUIPanelPanel','','tRad
+AjaxPanelOperacionesPanel','','tRadAjaxManager1SU','RadAjaxManager1SU'], [], [], 
+90, '');
+//]]>
+</script>
+<div id="RadWindowManager1" style="display:none;">
+<!-- 2015.1.401.40 --><div id="RadWindowExportacion" style="display:none;">
+<div id="RadWindowExportacion_C" style="display:none;">
+</div><input id="RadWindowExportacion_ClientState" 
+name="RadWindowExportacion_ClientState" type="hidden" autocomplete="off">
+ </div><div id="RadWindowPropiedades" style="display:none;">
+  <div id="RadWindowPropiedades_C" style="display:none;">
+  </div><input id="RadWindowPropiedades_ClientState" 
+name="RadWindowPropiedades_ClientState" type="hidden" autocomplete="off">
+ </div><div id="RadWindowManager1_alerttemplate" style="display:none;">
+     <div class="rwDialogPopup radalert">
+   <div class="rwDialogText">
+       {1}
+   </div>
+   
+   <div>
+    <a onclick="$find('{0}').close(true);" 
+class="rwPopupButton" href="javascript:void(0);">
+     <span class="rwOuterSpan">
+      <span 
+class="rwInnerSpan">##LOC[OK]##</span>
+     </span>
+        </a>
+   </div>
+  </div>
+  </div><div id="RadWindowManager1_prompttemplate" 
+style="display:none;">
+      <div class="rwDialogPopup radprompt">
+       <div class="rwDialogText">
+           {1}
+         </div>
+       <div>
+        <script type="text/javascript">
+        function RadWindowprompt_detectenter(id, ev, 
+input)
+              {
+         if (!ev) ev = window.event;            
+   
+         if (ev.keyCode == 13)
+              {
+                 
+             var but = 
+   input.parentNode.parentNode.getElementsByTagName("A")[0];
+         
+             if (but)
+              {
+  
+           if (but.click) 
+but.click();
+           else if (but.onclick)
+           {
+               but.focus(); var 
+  click = but.onclick; but.onclick = null; if (click) click.call(but);
+     
+           }
+          }
+            return false;
+         } 
+         else return true;
+         } 
+        </script>
+        <input title="Enter Value" onkeydown="return 
+RadWindowprompt_detectenter('{0}', event, this);" type="text" class="rwDialogInput"
+value="{2}">
+       </div>
+       <div>
+        <a 
+onclick="$find('{0}').close(this.parentNode.parentNode.getElementsByTagName('input'
+)[0].value);" class="rwPopupButton" href="javascript:void(0);"><span 
+class="rwOuterSpan"><span class="rwInnerSpan">##LOC[OK]##</span></span></a>
+        <a onclick="$find('{0}').close(null);" 
+class="rwPopupButton" href="javascript:void(0);"><span class="rwOuterSpan"><span 
+class="rwInnerSpan">##LOC[Cancel]##</span></span></a>
+       </div>
+          </div>       
+  </div><div id="RadWindowManager1_confirmtemplate" 
+style="display:none;">
+     <div class="rwDialogPopup radconfirm">
+   <div class="rwDialogText">
+       {1}
+         </div>
+   <div>
+    <a onclick="$find('{0}').close(true);" 
+class="rwPopupButton" href="javascript:void(0);"><span class="rwOuterSpan"><span 
+class="rwInnerSpan">##LOC[OK]##</span></span></a>
+    <a onclick="$find('{0}').close(false);" 
+class="rwPopupButton" href="javascript:void(0);"><span class="rwOuterSpan"><span 
+class="rwInnerSpan">##LOC[Cancel]##</span></span></a>
+   </div>
+    </div>
+  </div><input id="RadWindowManager1_ClientState" 
+name="RadWindowManager1_ClientState" type="hidden">
+</div>
+    <div id="RadAjaxManager1SU" style="display: none;">
+ <span id="RadAjaxManager1" style="display:none;"></span>
+</div>
+    <div id="RadAjaxLoading1" class="RadAjax RadAjax_Metro" style="display:none;">
+ <div class="raDiv">
+  
+    
+ </div><div class="raColor raTransp">
+ </div>
+</div>
+    
+    <div id="Garino_Axentria_CI_IFrame_Container" style="display: none;">
+    </div>
+    <div id="pagina" style="height: 100%">
+        <div id="headerPanel" style="height:10%;">
+ 
+            <div id="header">
+                <div class="logo">
+                </div>
+            </div>
+            <div class="clear">
+            </div>
+            <div style="position: absolute; right: 20px; top: 12px;">
+                <div class="sesionItems">
+                    <a id="linkCerrarSesion" class="iconosesion" 
+href="javascript:__doPostBack('linkCerrarSesion','')">Cerrar sesión</a>
+                    <a href="javascript:void(0);" id="usuario" 
+class="iconousuario">AxentriaTransfExt</a>
+                </div>
+            </div>
+        
+</div>
+        <div id="gridPanel" style="height:90%;width:100%;">
+ 
+            <div id="RadSplitter" style="width: 1516px; height: 639px;"><div 
+style=""><table id="RAD_SPLITTER_RadSplitter" class="RadSplitter RadSplitter_Metro"
+style="width:1px;height:1px;border-left-width:1px;border-top-width:1px;">
+  <tbody><tr>
+   <td id="RadPane1" class="rspPane rspFirstItem" 
+style="border-right-width:1px;border-bottom-width:1px;"><div 
+id="RAD_SPLITTER_PANE_CONTENT_RadPane1" style="width: 790px; height: 637px; 
+overflow: auto;">
+                    <div class="RadAjaxPanel" id="RadAjaxPanelGridPanel" 
+style="height: 100%; display: block;">
+    <div id="RadAjaxPanelGrid" style="height:100%;">
+     
+                        <div id="RadToolBar1" class="RadToolBar 
+RadToolBar_Horizontal RadToolBar_Metro RadToolBar_Metro_Horizontal" 
+style="width:100%;z-index:9000;">
+      <div class="rtbOuter 
+rtbRoundedCorners rtbShadows">
+       <div class="rtbMiddle">
+        <div 
+class="rtbInner">
+         <ul 
+class="rtbUL">
+          <li
+class="rtbItem rtbBtn"><a title="Exportar todo" class="rtbWrap" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rtbOut"><span class="rtbMid"><span class="rtbIn"><img 
+alt="Exportar todo" src="./img/exportar_todo.png" class="rtbIcon"><span 
+class="rtbText">Exportar todo</span></span></span></span></a></li><li 
+class="rtbItem rtbBtn"><a title="Exportar" class="rtbWrap" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rtbOut"><span class="rtbMid"><span class="rtbIn"><img 
+alt="Exportar" src="./img/exportar.png" class="rtbIcon"><span 
+class="rtbText">Exportar</span></span></span></span></a></li><li class="rtbItem 
+rtbBtn"><a title="Propiedades" class="rtbWrap" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rtbOut"><span class="rtbMid"><span class="rtbIn"><img 
+alt="Propiedades" src="./img/propiedades.png" class="rtbIcon"><span 
+class="rtbText">Propiedades</span></span></span></span></a></li>
+         </ul>
+        </div>
+       </div>
+      </div><input 
+id="RadToolBar1_ClientState" name="RadToolBar1_ClientState" type="hidden" 
+autocomplete="off">
+     </div>
+                        <div id="RadGridResultado" class="RadGrid RadGrid_Metro 
+RadGrid_Metro grid-hscroll" enablecolumnsviewstate="True" 
+style="height:93%;width:100%;" tabindex="0">
+     <div id="RadGridResultado_GroupPanel" 
+style="width:100%;">
+      <table 
+id="RadGridResultado_GroupPanel_TB" class="rgGroupPanel" 
+style="width:100%;border-spacing:0;border-collapse:separate;">
+       <thead>
+        <tr 
+style="display:none;">
+         <th 
+scope="col"></th>
+        </tr>
+       </thead><tbody>
+        <tr>
+         <td><table 
+style="width:100%;border-spacing:0;">
+          
+<thead>
+          
+<tr style="display:none;">
+          
+ <th scope="col"></th>
+          
+</tr>
+          
+</thead><tbody>
+          
+<tr>
+          
+ <td>Arrastre una columna aquí para agrupar por dicha columna</td>
+          
+</tr>
+          
+</tbody>
+         
+</table></td>
+        </tr>
+       </tbody>
+      </table>
+     </div><div class="rgHeaderWrapper"><div 
+id="RadGridResultado_GridHeader" class="rgHeaderDiv" style="overflow: hidden;">
+     <table class="rgMasterTable rgClipCells" 
+id="RadGridResultado_ctl00_Header" 
+style="width:100%;table-layout:fixed;overflow:hidden;empty-cells:show;">
+      <colgroup>
+  <col style="width:150px">
+ </colgroup>
+<thead>
+       <tr>
+        <th scope="col" 
+title="Arrastre para agrupar o reordenar" class="rgHeader" style="white-space: 
+nowrap; cursor: move;"><a 
+onclick="Telerik.Web.UI.Grid.Sort($find('RadGridResultado_ctl00'), 'nombre'); 
+return false;" title="Nombre" 
+href="javascript:__doPostBack('RadGridResultado$ctl00$ctl02$ctl01$ctl01','')">Nombr
+e</a></th>
+       </tr><tr 
+class="rgFilterRow">
+        <td 
+style="white-space:nowrap;"><input 
+name="RadGridResultado$ctl00$ctl02$ctl02$FilterTextBox_nombre" type="text" 
+size="10" id="RadGridResultado_ctl00_ctl02_ctl02_FilterTextBox_nombre" 
+class="rgFilterBox" alt="Filter nombre column" 
+onchange="$find(&quot;RadGridResultado_ctl00&quot;)._filterNoDelay(&quot;RadGridRes
+ultado_ctl00_ctl02_ctl02_FilterTextBox_nombre&quot;,&quot;nombre&quot;)" 
+onkeypress="if(event.keyCode == 13){ this.blur(); event.cancelBubble = true; 
+event.returnValue = false; if (event.stopPropagation){ event.stopPropagation(); 
+event.preventDefault();} 
+$find(&quot;RadGridResultado_ctl00&quot;)._filterNoDelay(&quot;RadGridResultado_ctl
+00_ctl02_ctl02_FilterTextBox_nombre&quot;,&quot;nombre&quot;) }" 
+style="width:75%;"><input type="button" 
+name="RadGridResultado$ctl00$ctl02$ctl02$Filter_nombre" value=" " 
+onclick="$find(&quot;RadGridResultado&quot;)._showFilterMenu(&quot;RadGridResultado
+_ctl00&quot;, &quot;nombre&quot;, event); return 
+false;__doPostBack('RadGridResultado$ctl00$ctl02$ctl02$Filter_nombre','')" 
+id="RadGridResultado_ctl00_ctl02_ctl02_Filter_nombre" title="Filtrar" 
+class="rgFilter"></td>
+       </tr>
+      </thead><tbody 
+style="display:none;"><tr><td colspan="1"></td></tr></tbody>
+     </table>
+ </div></div>
+      <div id="RadGridResultado_GridData"
+class="rgDataDiv" style="overflow: auto; width: 100%; height: 451px;">
+     <table class="rgMasterTable rgClipCells" 
+id="RadGridResultado_ctl00" 
+style="width:100%;table-layout:fixed;overflow:hidden;empty-cells:show;">
+      <colgroup>
+  <col style="width:150px">
+ </colgroup>
+<thead style="display:none;">
+       <tr>
+        <th 
+scope="col"></th>
+       </tr>
+      </thead><tbody>
+      <tr class="rgRow rgSelectedRow" 
+id="RadGridResultado_ctl00__0">
+       <td 
+style="white-space:nowrap;">312892_trasnfer_pdf52350.pdf</td>
+      </tr><tr class="rgAltRow" 
+id="RadGridResultado_ctl00__1">
+       <td 
+style="white-space:nowrap;">312892_312796_Proyectos_cloud_aws_pdf52350__2__pdf52350
+.pdf</td>
+      </tr>
+      </tbody>
+      </table> </div>
+     <div class="rgFooterWrapper"><div 
+id="RadGridResultado_GridFooter" class="rgFooterDiv" style="overflow: hidden;">
+     <table class="rgMasterTable rgClipCells" 
+id="RadGridResultado_ctl00_Footer" 
+style="width:100%;table-layout:fixed;overflow:hidden;empty-cells:show;">
+      <colgroup>
+  <col style="width:150px">
+ </colgroup>
+<thead style="display:none;">
+       <tr>
+        <th 
+scope="col"></th>
+       </tr>
+      </thead><tbody>
+       <tr class="rgFooter">
+        <td>&nbsp;</td>
+       </tr>
+      </tbody>
+     </table></div></div>
+     <table class="rgMasterTable rgClipCells" 
+id="RadGridResultado_ctl00_Pager" 
+style="width:100%;table-layout:fixed;overflow:hidden;empty-cells:show;">
+      <thead style="display:none;">
+       <tr>
+        <th 
+scope="col"></th>
+       </tr>
+      </thead><tbody>
+       <tr class=" rgPager">
+        <td 
+colspan="1"><table summary="Data pager which controls on which page is the RadGrid 
+control." style="width:100%;border-spacing:0;">
+         <caption>
+          
+<span style="display: none">Data pager</span>
+         
+</caption><thead>
+          
+<tr>
+          
+<th scope="col">Data pager</th>
+          
+</tr>
+         
+</thead><tbody>
+          
+<tr>
+          
+<td class="rgStatus"><div id="RadGridResultado_ctl00_ctl03_ctl01_statusPanel" 
+style="visibility:hidden;">
+          
+ &nbsp;
+          
+</div></td><td class="rgPagerCell NextPrevAndNumeric"><div class="rgWrap 
+rgArrPart1">
+          
+ <input type="button" name="RadGridResultado$ctl00$ctl03$ctl01$ctl02" 
+value=" " onclick="return 
+false;__doPostBack('RadGridResultado$ctl00$ctl03$ctl01$ctl02','')" title="Primera 
+página" class="rgPageFirst"> <input type="button" 
+name="RadGridResultado$ctl00$ctl03$ctl01$ctl03" value=" " onclick="return 
+false;__doPostBack('RadGridResultado$ctl00$ctl03$ctl01$ctl03','')" title="Página 
+anterior" class="rgPagePrev">
+          
+</div><div class="rgWrap rgNumPart">
+          
+ <a onclick="return false;" class="rgCurrentPage" 
+href="javascript:__doPostBack('RadGridResultado$ctl00$ctl03$ctl01$ctl05','')"><span
+>1</span></a>
+          
+</div><div class="rgWrap rgArrPart2">
+          
+ <input type="button" name="RadGridResultado$ctl00$ctl03$ctl01$ctl08" 
+value=" " onclick="return 
+false;__doPostBack('RadGridResultado$ctl00$ctl03$ctl01$ctl08','')" title="Siguiente
+página" class="rgPageNext">  <input type="button" 
+name="RadGridResultado$ctl00$ctl03$ctl01$ctl09" value=" " onclick="return 
+false;__doPostBack('RadGridResultado$ctl00$ctl03$ctl01$ctl09','')" title="Última 
+página" class="rgPageLast">
+          
+</div><div class="rgWrap rgAdvPart">
+          
+ <span id="RadGridResultado_ctl00_ctl03_ctl01_ChangePageSizeLabel" 
+class="rgPagerLabel">Docs/pág.:</span><div 
+id="RadGridResultado_ctl00_ctl03_ctl01_PageSizeComboBox" class="RadComboBox 
+RadComboBox_Metro" style="width:46px;white-space:normal;">
+          
+  <table summary="" 
+style="border-width:0;border-collapse:collapse;width:100%" class="">
+          
+   <caption style="display: none;">
+          
+    PageSizeComboBox
+          
+   </caption><tbody><tr class="rcbReadOnly">
+          
+    <td class="rcbInputCell rcbInputCellLeft" 
+style="width:100%;"><input 
+name="RadGridResultado$ctl00$ctl03$ctl01$PageSizeComboBox" type="text" 
+class="rcbInput radPreventDecorate" 
+id="RadGridResultado_ctl00_ctl03_ctl01_PageSizeComboBox_Input" value="20" 
+readonly="readonly" autocomplete="off"></td><td class="rcbArrowCell 
+rcbArrowCellRight"><a 
+id="RadGridResultado_ctl00_ctl03_ctl01_PageSizeComboBox_Arrow" style="overflow: 
+hidden;display: block;position: relative;outline: none;">select</a></td>
+          
+   </tr>
+          
+  </tbody></table><div class="rcbSlide" 
+style="z-index:6000;display:none;"><div 
+id="RadGridResultado_ctl00_ctl03_ctl01_PageSizeComboBox_DropDown" 
+class="RadComboBoxDropDown RadComboBoxDropDown_Metro "><div class="rcbScroll 
+rcbWidth"><ul class="rcbList" 
+style="list-style:none;margin:0;padding:0;zoom:1;"><li class="rcbItem">10</li><li 
+class="rcbItem">20</li><li class="rcbItem">50</li><li class="rcbItem">100</li><li 
+class="rcbItem">200</li></ul></div></div></div><input 
+id="RadGridResultado_ctl00_ctl03_ctl01_PageSizeComboBox_ClientState" 
+name="RadGridResultado_ctl00_ctl03_ctl01_PageSizeComboBox_ClientState" 
+type="hidden" autocomplete="off">
+          
+ </div>
+          
+</div><div class="rgWrap rgInfoPart">
+          
+  &nbsp;<strong>1</strong> pags, <strong>2</strong> docs.
+          
+</div></td>
+          
+</tr>
+         </tbody>
+        </table></td>
+       </tr>
+      </tbody>
+     </table><div id="RadGridResultado_rfltMenu"
+style="display: none; visibility: visible; z-index: 7000;">
+      <div class="RadMenu RadMenu_Metro 
+RadMenu_Context RadMenu_Metro_Context" id="RadGridResultado_rfltMenu_detached" 
+style="display: none; visibility: visible; z-index: 7000;">
+       <ul class="rmActive 
+rmVertical rmGroup rmLevel1" style="float: left;">
+        <li class="rmItem 
+rmFirst"><a class="rmLink" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rmText">Sin Filtro</span></a></li><li class="rmItem 
+"><a class="rmLink" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rmText">Contiene</span></a></li><li class="rmItem "><a 
+class="rmLink" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rmText">No Contiene</span></a></li><li class="rmItem 
+"><a class="rmLink" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rmText">Comienza con</span></a></li><li class="rmItem 
+"><a class="rmLink" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rmText">Finaliza con</span></a></li><li class="rmItem 
+"><a class="rmLink" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rmText">Igual a</span></a></li><li class="rmItem "><a 
+class="rmLink" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rmText">No es igual a</span></a></li><li class="rmItem 
+"><a class="rmLink" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rmText">Es mayor a</span></a></li><li class="rmItem 
+"><a class="rmLink" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rmText">Es menor que</span></a></li><li class="rmItem 
+"><a class="rmLink" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rmText">Es mayor o igual a</span></a></li><li 
+class="rmItem "><a class="rmLink" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rmText">Es menor o igual a</span></a></li><li 
+class="rmItem "><a class="rmLink" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rmText">Entre</span></a></li><li class="rmItem "><a 
+class="rmLink" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rmText">No Entre</span></a></li><li class="rmItem "><a 
+class="rmLink" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rmText">Esta vacio</span></a></li><li class="rmItem 
+"><a class="rmLink" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rmText">No esta vacio</span></a></li><li class="rmItem 
+"><a class="rmLink" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rmText">Es nulo</span></a></li><li class="rmItem "><a 
+class="rmLink" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rmText">No es nulo</span></a></li><li class="rmItem 
+rmLast"><a class="rmLink" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rmText">Personalizado</span></a></li>
+       </ul>
+      </div><input 
+id="RadGridResultado_rfltMenu_ClientState" 
+name="RadGridResultado_rfltMenu_ClientState" type="hidden" autocomplete="off">
+     </div><input 
+id="RadGridResultado_ClientState" name="RadGridResultado_ClientState" type="hidden"
+autocomplete="off" 
+value="{&quot;selectedIndexes&quot;:[&quot;0&quot;],&quot;selectedCellsIndexes&quot
+;:[],&quot;unselectableItemsIndexes&quot;:[],&quot;reorderedColumns&quot;:[],&quot;
+expandedItems&quot;:[],&quot;expandedGroupItems&quot;:[],&quot;expandedFilterItems&
+quot;:[],&quot;deletedItems&quot;:[],&quot;hidedColumns&quot;:[],&quot;showedColumn
+s&quot;:[],&quot;groupColsState&quot;:{},&quot;hierarchyState&quot;:{},&quot;scroll
+edPosition&quot;:&quot;0,0&quot;,&quot;popUpLocations&quot;:{},&quot;draggedItemsIn
+ dexes&quot;:[]}"> </div>
+     
+                        <!-- MENU CONTEXTUAL -->
+                        <div id="RadContextMenuDocumento" style="display: none; 
+visibility: visible; z-index: 7000;">
+      <div class="RadMenu RadMenu_Metro 
+RadMenu_Context RadMenu_Metro_Context   rmShadows" 
+id="RadContextMenuDocumento_detached" style="display: none; visibility: visible; 
+z-index: 7000;">
+       <ul class="rmActive 
+rmVertical rmGroup rmLevel1" style="float: left;">
+        <li class="rmItem 
+rmFirst"><a class="rmLink" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rmText">Exportar</span></a></li><li class="rmItem 
+rmLast"><a class="rmLink" 
+href="http://pyhmlw415/AxentriaCI/index.aspx?pa5v361Bujqfdi3zuuyXNjOYmGha2E4h429LJZ
+2r9bZOEnqBr7flyo/eAbgslL36gpwL43Tmlx7i6v+2YPn1Jzbfp6PwsW5e8wIbaxb4Hg/+5kOIGCK/BUX5p
+EKLZcL0IQK1GW7k+5LVLctRcBCGwAMmsbAFMMuW0Ja29RVKxIGI6xKE3cKbAPFwgW8YK9eWv8VqcB3dw6OQ
+Vf4qGWKCdQ==#"><span class="rmText">Propiedades</span></a></li>
+       </ul>
+      </div><input 
+id="RadContextMenuDocumento_ClientState" name="RadContextMenuDocumento_ClientState"
+type="hidden" autocomplete="off">
+     </div>
+                    
+    </div>
+   </div>
+                </div><input id="RadPane1_ClientState" name="RadPane1_ClientState" 
+type="hidden" autocomplete="off" 
+value="{&quot;_originalWidth&quot;:&quot;&quot;,&quot;_originalHeight&quot;:&quot;&
+quot;,&quot;_collapsedDirection&quot;:1,&quot;_scrollLeft&quot;:0,&quot;_scrollTop&
+quot;:0,&quot;_expandedSize&quot;:0,&quot;width&quot;:790,&quot;height&quot;:637,&q
+uot;collapsed&quot;:false,&quot;contentUrl&quot;:&quot;&quot;,&quot;minWidth&quot;:
+20,&quot;maxWidth&quot;:10000,&quot;minHeight&quot;:20,&quot;maxHeight&quot;:10000,
+&quot;locked&quot;:false}"></td><td class="rspResizeBar" id="RadSplitBarPorTipo" 
+style="border-right-width: 1px; border-bottom-width: 1px; cursor: w-resize;" 
+unselectable="on"><input id="RAD_SPLITTER_BAR_COLLAPSE_Backward_RadSplitBarPorTipo"
+class="rspCollapseBarExpand" title="Collapse/expand the right pane" type="button" 
+value=" " unselectable="on"><input id="RAD_SPLITBAR_SPACER_RadSplitBarPorTipo" 
+class="rspCollapseBarSpacer" style="width:4px;height:1px;line-height:1px;" 
+type="button" value=" "><div style="display:none;">
+    <input id="RadSplitBarPorTipo_ClientState" 
+name="RadSplitBarPorTipo_ClientState" type="hidden" autocomplete="off">
+   </div></td><td id="RadPane2" class="rspPane rspLastItem" 
+style="border-right-width:1px;border-bottom-width:1px;"><div 
+id="RAD_SPLITTER_PANE_CONTENT_RadPane2" style="width: 712px; height: 637px; 
+overflow: auto;">
+                    <div class="RadAjaxPanel" id="RadAjaxPanel1Panel" 
+style="height: 100%; display: block;">
+    <div id="RadAjaxPanel1" style="height:100%;">
+     
+                        <iframe id="visor" style="width: 100%; height: 99%; border:
+none;
+                            z-index: -1;" 
+src="http://pyhmlw412.interbanco.com.py/WebImagenes/VisorDocuViewer.aspx?dummy=6391
+53076194692548&amp;iddocumento=10818566&amp;idversion=1&amp;idusuario=2307&amp;inic
+nxticks=639153076150000000&amp;cantidadpaginas=0&amp;nombreDocumento=312892_trasnfe
+r_pdf52350.pdf&amp;textoMarcaDeAgua=&amp;colorMarcaDeAgua=&amp;imprimirMarcaDeAgua=
+False&amp;mostrarMarcaDeAgua=False&amp;posicionMarcaDeAgua=0&amp;versionadoLicencia
+do=True&amp;rolImpresion=1&amp;rolExportacion=1&amp;operacion=lectura&amp;extension
+=.pdf&amp;dummy=639153076194692548"></iframe>
+                        <div style="display: none">
+                            <span id="btnVisor" class="RadButton RadButton_Metro 
+rbSkinnedButton" tabindex="0"><input class="rbDecorated" type="submit" 
+name="btnVisor" id="btnVisor_input" value="Actualizar" tabindex="-1"><input 
+id="btnVisor_ClientState" name="btnVisor_ClientState" type="hidden" 
+autocomplete="off"></span>
+                        </div>
+                    
+    </div>
+   </div>
+                </div><input id="RadPane2_ClientState" name="RadPane2_ClientState" 
+type="hidden" autocomplete="off" 
+value="{&quot;_originalWidth&quot;:&quot;&quot;,&quot;_originalHeight&quot;:&quot;&
+quot;,&quot;_collapsedDirection&quot;:1,&quot;_scrollLeft&quot;:0,&quot;_scrollTop&
+quot;:0,&quot;_expandedSize&quot;:0,&quot;width&quot;:712,&quot;height&quot;:637,&q
+uot;collapsed&quot;:false,&quot;contentUrl&quot;:&quot;&quot;,&quot;minWidth&quot;:
+20,&quot;maxWidth&quot;:10000,&quot;minHeight&quot;:20,&quot;maxHeight&quot;:10000,
+&quot;locked&quot;:false}"></td>
+  </tr>
+ </tbody></table><input id="RadSplitter_ClientState" 
+name="RadSplitter_ClientState" type="hidden" autocomplete="off"></div></div>
+            <div style="border-top: silver 2px solid;">
+                <div id="divVersionDoc" class="label-version" style="display: 
+none;">
+                    Versión: <span id="lblVersionDoc"></span>
+                </div>
+                <div id="divUltimaVersionDoc" class="label-version ultimaversion" 
+style="display: block;">
+                    Ultima versión: <span id="lblUltimaVersionDoc">1</span>
+                </div>
+            </div>
+        
+</div>
+        <div class="RadAjaxPanel" id="persGUIPanelPanel" style="display: block;">
+ <div id="persGUIPanel">
+  
+            <div id="ci_persistenciaGui" style="display: none">
+                <input type="hidden" name="splitterWidth" id="splitterWidth" 
+value="0.5217965653896962">
+            </div>
+        
+ </div>
+</div>
+        <div class="RadAjaxPanel" id="RadAjaxPanelOperacionesPanel" style="display:
+block;">
+ <div id="RadAjaxPanelOperaciones">
+  
+        
+</div>
+</div>
+</div>
+<script type="text/javascript">
+//<![CDATA[
+Telerik.Web.UI.RadSplitter._preInitialize("RadSplitter");Telerik.Web.UI.RadPane._pr
+eInitialize("RadPane1", "RadSplitter", "", "RadSplitBarPorTipo",  0, 0, 
+"False");Telerik.Web.UI.RadSplitBar._preInitialize("RadSplitBarPorTipo", 
+"RadSplitter", "RadPane1", "RadPane2", 1, 
+0);Telerik.Web.UI.RadPane._preInitialize("RadPane2", "RadSplitter", 
+"RadSplitBarPorTipo", "",  2, 1, "True");Sys.Application.add_init(function() {
+$create(Telerik.Web.UI.RadWindow, 
+{"_dockMode":false,"behaviors":36,"clientStateFieldID":"RadWindowExportacion_Client
+State","formID":"form1","height":"160px","iconUrl":"","minimizeIconUrl":"","modal":
+true,"name":"RadWindowExportacion","navigateUrl":"/Paginas/Exportacion.aspx","reloa
+dOnShow":true,"restrictionZoneID":"pagina","showContentDuringLoad":false,"skin":"Me
+tro","visibleStatusbar":false,"width":"474px"}, null, null, 
+$get("RadWindowExportacion"));
+});
+Sys.Application.add_init(function() {
+$create(Telerik.Web.UI.RadWindow, 
+{"_dockMode":false,"behaviors":36,"clientStateFieldID":"RadWindowPropiedades_Client
+State","formID":"form1","height":"500px","iconUrl":"","minimizeIconUrl":"","modal":
+true,"name":"RadWindowPropiedades","navigateUrl":"/Paginas/Propiedades.aspx","reloa
+dOnShow":true,"restrictionZoneID":"pagina","showContentDuringLoad":false,"skin":"Me
+tro","visibleStatusbar":false,"width":"750px"}, {"close":OnWindowClose}, null, 
+$get("RadWindowPropiedades"));
+});
+Sys.Application.add_init(function() {
+$create(Telerik.Web.UI.RadWindowManager, 
+{"clientStateFieldID":"RadWindowManager1_ClientState","formID":"form1","iconUrl":""
+,"minimizeIconUrl":"","name":"RadWindowManager1","skin":"Metro","windowControls":"[
+'RadWindowExportacion','RadWindowPropiedades']"}, null, 
+{"child":"RadWindowExportacion"}, $get("RadWindowManager1"));
+});
+Sys.Application.add_init(function() {
+$create(Telerik.Web.UI.RadAjaxManager, 
+{"_updatePanels":"","ajaxSettings":[],"clientEvents":{OnRequestStart:"RequestStart"
+,OnResponseEnd:"ResponseEnd"},"defaultLoadingPanelID":"","enableAJAX":true,"enableH
+istory":false,"links":[],"styles":[],"uniqueID":"RadAjaxManager1","updatePanelsRend
+erMode":0}, null, null, $get("RadAjaxManager1"));
+});
+Sys.Application.add_init(function() {
+$create(Telerik.Web.UI.RadAjaxLoadingPanel, 
+{"initialDelayTime":0,"isSticky":false,"minDisplayTime":0,"skin":"Metro","uniqueID"
+:"RadAjaxLoading1","zIndex":90000}, null, null, $get("RadAjaxLoading1"));
+});
+Sys.Application.add_init(function() {
+$create(Telerik.Web.UI.RadToolBar, 
+{"_cssClass":"","_postBackReference":"__doPostBack(\u0027RadToolBar1\u0027,\u0027{0
+}\u0027)","_simplePostBack":true,"_skin":"Metro","attributes":{},"clientStateFieldI
+D":"RadToolBar1_ClientState","collapseAnimation":"{\"duration\":450}","enableRounde
+dCorners":true,"enableShadows":true,"expandAnimation":"{\"duration\":450}","itemDat
+a":[{"value":"exportartodo","toolTip":"Exportar 
+todo","cssClass":"rtbWrap","imageUrl":"./img/exportar_todo.png"},{"value":"exportar
+","toolTip":"Exportar","cssClass":"rtbWrap","imageUrl":"./img/exportar.png"},{"valu
+e":"propiedades","toolTip":"Propiedades","cssClass":"rtbWrap","imageUrl":"./img/pro
+piedades.png"}]}, {"buttonClicking":RadToolBar1ItemClicking}, null, 
+$get("RadToolBar1"));
+});
+WebForm_InitCallback();Sys.Application.add_init(function() {
+$create(Telerik.Web.UI.RadComboBox, 
+{"_dropDownWidth":0,"_height":0,"_skin":"Metro","_text":"20","_uniqueId":"RadGridRe
+sultado$ctl00$ctl03$ctl01$PageSizeComboBox","_value":"20","clientStateFieldID":"Rad
+GridResultado_ctl00_ctl03_ctl01_PageSizeComboBox_ClientState","collapseAnimation":"
+{\"duration\":450}","expandAnimation":"{\"duration\":450}","itemData":[{"value":"10
+","attributes":{"ownerTableViewId":"RadGridResultado_ctl00"}},{"value":"20","select
+ed":true,"attributes":{"ownerTableViewId":"RadGridResultado_ctl00"}},{"value":"50",
+"attributes":{"ownerTableViewId":"RadGridResultado_ctl00"}},{"value":"100","attribu
+tes":{"ownerTableViewId":"RadGridResultado_ctl00"}},{"value":"200","attributes":{"o
+wnerTableViewId":"RadGridResultado_ctl00"}}],"localization":"{\"AllItemsCheckedStri
+ng\":\"All items checked\",\"ItemsCheckedString\":\"items 
+checked\",\"CheckAllString\":\"Check All\"}","selectedIndex":1}, 
+{"selectedIndexChanged":Telerik.Web.UI.Grid.ChangePageSizeComboHandler,"selectedInd
+exChanging":Telerik.Web.UI.Grid.ChangingPageSizeComboHandler}, null, 
+$get("RadGridResultado_ctl00_ctl03_ctl01_PageSizeComboBox"));
+});
+Sys.Application.add_init(function() {
+$create(Telerik.Web.UI.RadContextMenu, 
+{"_childListElementCssClass":null,"_skin":"Metro","clickToOpen":true,"clientStateFi
+eldID":"RadGridResultado_rfltMenu_ClientState","collapseAnimation":"{\"duration\":4
+50}","expandAnimation":"{\"duration\":450}","itemData":[{"attributes":{"columnUniqu
+eName":"","tableID":""},"postBack":0,"value":"NoFilter"},{"attributes":{"columnUniq
+ueName":"","tableID":""},"postBack":0,"value":"Contains"},{"attributes":{"columnUni
+queName":"","tableID":""},"postBack":0,"value":"DoesNotContain"},{"attributes":{"co
+lumnUniqueName":"","tableID":""},"postBack":0,"value":"StartsWith"},{"attributes":{
+"columnUniqueName":"","tableID":""},"postBack":0,"value":"EndsWith"},{"attributes":
+{"columnUniqueName":"","tableID":""},"postBack":0,"value":"EqualTo"},{"attributes":
+{"columnUniqueName":"","tableID":""},"postBack":0,"value":"NotEqualTo"},{"attribute
+s":{"columnUniqueName":"","tableID":""},"postBack":0,"value":"GreaterThan"},{"attri
+butes":{"columnUniqueName":"","tableID":""},"postBack":0,"value":"LessThan"},{"attr
+ibutes":{"columnUniqueName":"","tableID":""},"postBack":0,"value":"GreaterThanOrEqu
+alTo"},{"attributes":{"columnUniqueName":"","tableID":""},"postBack":0,"value":"Les
+sThanOrEqualTo"},{"attributes":{"columnUniqueName":"","tableID":""},"postBack":0,"v
+alue":"Between"},{"attributes":{"columnUniqueName":"","tableID":""},"postBack":0,"v
+alue":"NotBetween"},{"attributes":{"columnUniqueName":"","tableID":""},"postBack":0
+,"value":"IsEmpty"},{"attributes":{"columnUniqueName":"","tableID":""},"postBack":0
+,"value":"NotIsEmpty"},{"attributes":{"columnUniqueName":"","tableID":""},"postBack
+":0,"value":"IsNull"},{"attributes":{"columnUniqueName":"","tableID":""},"postBack"
+:0,"value":"NotIsNull"},{"attributes":{"columnUniqueName":"","tableID":""},"postBac
+k":0,"value":"Custom"}],"targets":[]}, {"shown":MenuShowing}, null, 
+$get("RadGridResultado_rfltMenu"));
+});
+Sys.Application.add_init(function() {
+$create(Telerik.Web.UI.RadGrid, 
+{"ClientID":"RadGridResultado","ClientSettings":{"AllowAutoScrollOnDragDrop":true,"
+EnableRowHoverStyle":true,"AllowDragToGroup":true,"AllowKeyboardNavigation":true,"S
+houldCreateRows":true,"ReorderColumnsOnClient":true,"DataBinding":{},"Selecting":{"
+CellSelectionMode":0,"AllowRowSelect":true,"EnableDragToSelectRows":true},"Scrollin
+g":{"AllowScroll":true,"SaveScrollPosition":true,"ScrollHeight":"300px","UseStaticH
+eaders":true},"Resizing":{"AllowColumnResize":true,"ClipCellContentOnResize":true,"
+EnableRealTimeResize":true,"AllowResizeToFit":true},"ClientMessages":{"DragToGroupO
+rReorder":"Arrastre para agrupar o reordenar","DragToResize":"Arrastre para cambiar
+el tamaño","DropHereToReorder":"Coloque aquí para 
+reordenar","PagerTooltipFormatString":"Pág. 
+\u003cstrong\u003e{0}\u003c/strong\u003e de 
+\u003cstrong\u003e{1}\u003c/strong\u003e","ColumnResizeTooltipFormatString":"Ancho:
+\u003cstrong\u003e{0}\u003c/strong\u003e 
+\u003cem\u003epixels\u003c/em\u003e"},"KeyboardNavigationSettings":{"AllowActiveRow
+Cycle":false,"EnableKeyboardShortcuts":true,"FocusKey":89,"InitInsertKey":73,"Rebin
+dKey":82,"ExitEditInsertModeKey":27,"UpdateInsertItemKey":13,"DeleteActiveRow":127,
+"ExpandDetailTableKey":39,"CollapseDetailTableKey":37,"SaveChangesKey":85,"CancelCh
+angesKey":67},"Animation":{},"Virtualization":{}},"ShowGroupPanel":true,"Skin":"Met
+ro","UniqueID":"RadGridResultado","ValidationSettings":{"EnableValidation":true,"Va
+lidationGroup":"","CommandsToValidate":["PerformInsert","Update"]},"_activeRowIndex
+":"","_clientKeyValues":{"0":{"IdDocumento":"10818566","Nombre":"312892_trasnfer_pd
+f52350.pdf","Url":"http://pyhmlw412.interbanco.com.py/WebImagenes/VisorDocuViewer.a
+spx?dummy=639153076194692548\u0026iddocumento=10818566\u0026idversion=1\u0026idusua
+rio=2307\u0026inicnxticks=639153076150000000\u0026cantidadpaginas=0\u0026nombreDocu
+mento=312892_trasnfer_pdf52350.pdf\u0026textoMarcaDeAgua=\u0026colorMarcaDeAgua=\u0
+026imprimirMarcaDeAgua=False\u0026mostrarMarcaDeAgua=False\u0026posicionMarcaDeAgua
+=0\u0026versionadoLicenciado=True\u0026rolImpresion=1\u0026rolExportacion=1\u0026op
+eracion=lectura\u0026extension=.pdf\u0026dummy=639153076194692548","FirmaValida":"T
+rue","Version":"1"},"1":{"IdDocumento":"10818565","Nombre":"312892_312796_Proyectos
+_cloud_aws_pdf52350__2__pdf52350.pdf","Url":"http://pyhmlw412.interbanco.com.py/Web
+Imagenes/VisorDocuViewer.aspx?dummy=639153076194692548\u0026iddocumento=10818565\u0
+026idversion=1\u0026idusuario=2307\u0026inicnxticks=639153076150000000\u0026cantida
+dpaginas=0\u0026nombreDocumento=312892_312796_Proyectos_cloud_aws_pdf52350__2__pdf5
+2350.pdf\u0026textoMarcaDeAgua=\u0026colorMarcaDeAgua=\u0026imprimirMarcaDeAgua=Fal
+se\u0026mostrarMarcaDeAgua=False\u0026posicionMarcaDeAgua=0\u0026versionadoLicencia
+do=True\u0026rolImpresion=1\u0026rolExportacion=1\u0026operacion=lectura\u0026exten
+sion=.pdf\u0026dummy=639153076194692548","FirmaValida":"True","Version":"1"}},"_con
+trolToFocus":"","_currentPageIndex":0,"_defaultDateTimeFormat":"d/M/yyyy 
+H:mm:ss","_editIndexes":"[]","_embeddedSkin":true,"_freezeText":"Freeze","_gridTabl
+eViewsData":"[{\"ClientID\":\"RadGridResultado_ctl00\",\"UniqueID\":\"RadGridResult
+ado$ctl00\",\"PageSize\":20,\"PageCount\":1,\"EditMode\":\"EditForms\",\"AllowPagin
+g\":true,\"CurrentPageIndex\":0,\"VirtualItemCount\":2,\"AllowMultiColumnSorting\":
+false,\"AllowNaturalSort\":true,\"AllowFilteringByColumn\":true,\"PageButtonCount\"
+:2,\"HasDetailTables\":false,\"HasMultiHeaders\":false,\"CheckListWebServicePath\":
+\"\",\"PagerAlwaysVisible\":true,\"IsItemInserted\":false,\"clientDataKeyNames\":[\
+"IdDocumento\",\"Nombre\",\"Url\",\"FirmaValida\",\"Version\"],\"hasDetailItemTempl
+ate\":false,\"_dataBindTemplates\":false,\"_selectedItemStyle\":\"\",\"_selectedIte
+mStyleClass\":\"rgSelectedRow\",\"_renderActiveItemStyle\":\"\",\"_renderActiveItem
+StyleClass\":\"rgActiveRow\",\"isFilterItemExpanded\":true,\"_columnsData\":[{\"Uni
+queName\":\"nombre\",\"Resizable\":true,\"Reorderable\":false,\"Selectable\":true,\
+"Groupable\":true,\"ColumnType\":\"GridBoundColumn\",\"ColumnGroupName\":\"\",\"Edi
+table\":true,\"SortExpression\":\"nombre\",\"DataTypeName\":\"System.String\",\"Fil
+terListOptions\":0,\"CurrentFilterFunction\":0,\"CurrentFilterValue\":\"\",\"AndCur
+rnetFilterFunction\":0,\"AndCurrentFilterValue\":\"\",\"Acff\":\"NoFilter\",\"Curre
+ntFilterFunctionName\":\"NoFilter\",\"AndCurrentFilterFunctionName\":\"NoFilter\",\
+"DataField\":\"nombre\",\"Display\":true}]}]","_groupPanelClientID":"RadGridResulta
+do_GroupPanel_TB","_groupPanelItems":"[]","_groupPanelText":"Arrastre una columna 
+aquí para agrupar por dicha 
+columna","_groupingSettings":{"GroupContinuesFormatString":"El grupo continua en la
+siguiente página.","GroupContinuedFormatString":"... el grupo viene de la página 
+anterior.","GroupSplitDisplayFormat":"Mostrando {0} de {1} 
+elementos.","GroupSplitFormat":" ({0})","GroupByFieldsSeparator":"; 
+","CaseSensitive":false,"ExpandTooltip":"Expandir el 
+grupo","CollapseTooltip":"Colapsar grupo","UnGroupTooltip":"Arrastre fuera de la 
+barra para desagrupar","UnGroupButtonTooltip":"Haga click aquí para 
+desagrupar","ShowUnGroupButton":false,"RetainGroupFootersVisibility":false,"MainTab
+leSummary":"","NestedTableSummary":"","GroupItemsWrapperTableSummary":"","MainTable
+Caption":"","NestedTableCaption":"","GroupItemsWrapperTableCaption":"","ViewState":
+{}},"_loadingText":"Cargando...","_masterClientID":"RadGridResultado_ctl00","_ready
+Text":"Listo","_shouldFocusOnPage":false,"_statusLabelID":"RadGridResultado_ctl00_c
+tl03_ctl01_statusPanel","_unfreezeText":"Unfreeze","allowMultiRowSelection":true,"c
+lientStateFieldID":"RadGridResultado_ClientState","expandItems":{},"renderMode":1},
+{"columnResized":OnGridColumnResized,"filterMenuShowing":FilterMenuShowing,"gridCre
+ated":OnGridCreated,"keyPress":OnGridKeyPress,"rowContextMenu":OnRadGridResultadoRo
+wContextMenu,"rowSelected":OnRowSelected,"rowSelecting":OnRowSelecting}, null, 
+$get("RadGridResultado"));
+});
+Sys.Application.add_init(function() {
+$create(Telerik.Web.UI.RadContextMenu, 
+{"_childListElementCssClass":null,"_skin":"Metro","clientStateFieldID":"RadContextM
+enuDocumento_ClientState","collapseAnimation":"{\"duration\":450}","enableShadows":
+true,"expandAnimation":"{\"duration\":450}","itemData":[{"value":"exportar"},{"valu
+e":"propiedades"}],"targets":[]}, 
+{"itemClicking":OnRadContextMenuDocumentoItemClicking}, null, 
+$get("RadContextMenuDocumento"));
+});
+Sys.Application.add_init(function() {
+$create(Telerik.Web.UI.RadAjaxPanel, 
+{"clientEvents":{OnRequestStart:"",OnResponseEnd:""},"enableAJAX":true,"enableHisto
+ry":false,"links":[],"loadingPanelID":"RadAjaxLoading1","styles":[],"uniqueID":"Rad
+AjaxPanelGrid"}, null, null, $get("RadAjaxPanelGrid"));
+});
+Sys.Application.add_init(function() {
+$create(Telerik.Web.UI.RadPane, 
+{"_collapsedDirection":1,"_expandedSize":0,"_originalHeight":"","_originalWidth":""
+,"_scrollLeft":0,"_scrollTop":0,"_splitterOrientation":1,"clientStateFieldID":"RadP
+ane1_ClientState"}, null, null, $get("RadPane1"));
+});
+Sys.Application.add_init(function() {
+$create(Telerik.Web.UI.RadSplitBar, 
+{"_liveResize":false,"_splitterOrientation":1,"clientStateFieldID":"RadSplitBarPorT
+ipo_ClientState","collapseMode":3}, null, null, $get("RadSplitBarPorTipo"));
+});
+Sys.Application.add_init(function() {
+$create(Telerik.Web.UI.RadButton, 
+{"_accessKey":"","_hasIcon":false,"_hasImage":false,"_isClientSubmit":false,"_isIma
+geButton":false,"_postBackReference":"","_renderMode":1,"clientStateFieldID":"btnVi
+sor_ClientState","iconData":{},"imageData":{},"text":"Actualizar","toggleStatesData
+":[],"uniqueGroupName":"","uniqueID":"btnVisor"}, null, null, $get("btnVisor"));
+});
+Sys.Application.add_init(function() {
+$create(Telerik.Web.UI.RadAjaxPanel, 
+{"clientEvents":{OnRequestStart:"",OnResponseEnd:""},"enableAJAX":true,"enableHisto
+ry":false,"links":[],"loadingPanelID":"RadAjaxLoading1","styles":[],"uniqueID":"Rad
+AjaxPanel1"}, null, null, $get("RadAjaxPanel1"));
+});
+Sys.Application.add_init(function() {
+$create(Telerik.Web.UI.RadPane, 
+{"_collapsedDirection":1,"_expandedSize":0,"_originalHeight":"","_originalWidth":""
+,"_scrollLeft":0,"_scrollTop":0,"_splitterOrientation":1,"clientStateFieldID":"RadP
+ane2_ClientState"}, null, null, $get("RadPane2"));
+});
+Sys.Application.add_init(function() {
+$create(Telerik.Web.UI.RadSplitter, 
+{"_attachResizeHandler":true,"_height":"95%","_isNested":false,"_registerWithScript
+Manager":true,"_width":"99.8%","clientStateFieldID":"RadSplitter_ClientState"}, 
+null, null, $get("RadSplitter"));
+});
+Sys.Application.add_init(function() {
+$create(Telerik.Web.UI.RadAjaxPanel, 
+{"clientEvents":{OnRequestStart:"",OnResponseEnd:""},"enableAJAX":true,"enableHisto
+ry":false,"links":[],"loadingPanelID":"","styles":[],"uniqueID":"persGUIPanel"}, 
+null, null, $get("persGUIPanel"));
+});
+Sys.Application.add_init(function() {
+$create(Telerik.Web.UI.RadAjaxPanel, 
+{"clientEvents":{OnRequestStart:"",OnResponseEnd:""},"enableAJAX":true,"enableHisto
+ry":false,"links":[],"loadingPanelID":"RadAjaxLoading1","styles":[],"uniqueID":"Rad
+AjaxPanelOperaciones"}, null, null, $get("RadAjaxPanelOperaciones"));
+});
+//]]>
+</script>
+</form>
+<script type="text/javascript">
+//Eventos para la persistencia de la GUI
+Sys.Application.add_load(AxentriaCI_LoadGuiState);
+Sys.Application.add_load(AxentriaCI_OnClientLoad);
+</script>
+<script src="./Axentria CI_files/RadAlertConfirmPromptAutoSize.js.descarga" 
+type="text/javascript"></script>
+</body></html>

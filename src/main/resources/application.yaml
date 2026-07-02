@@ -3,8 +3,8 @@ spring:
     name: axentria-document-downloader
 
 download:
-  url: "https://freekidsbooks.org"
-  cssSelector: "a.download-book.my-post-like"
+  axentriaBaseUrl: "http://pyhmlw415/AxentriaCI"
+  linksSelector: "a.list-group-item"
   directory: "/mnt/Downloads"
   s3:
     bucket: "${S3_BUCKET:}"

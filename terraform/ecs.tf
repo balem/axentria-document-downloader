@@ -47,12 +47,12 @@ resource "aws_ecs_task_definition" "app" {
           value = aws_s3_bucket.downloads.id
         },
         {
-          name  = "DOWNLOAD_URL"
-          value = "https://freekidsbooks.org"
+          name  = "DOWNLOAD_AXENTRIA_BASE_URL"
+          value = "http://pyhmlw415/AxentriaCI"
         },
         {
-          name  = "DOWNLOAD_CSS_SELECTOR"
-          value = "a.download-book.my-post-like"
+          name  = "DOWNLOAD_LINKS_SELECTOR"
+          value = "a.list-group-item"
         },
         {
           name  = "DOWNLOAD_DIRECTORY"

@@ -28,8 +28,8 @@ java -jar target/*.jar              # run app
 
 | Property | Default | Env override |
 |---|---|---|
-| `download.url` | `https://freekidsbooks.org` | `DOWNLOAD_URL` |
-| `download.cssSelector` | `a.download-book.my-post-like` | `DOWNLOAD_CSS_SELECTOR` |
+| `download.axentriaBaseUrl` | `http://pyhmlw415/AxentriaCI` | `DOWNLOAD_AXENTRIA_BASE_URL` |
+| `download.linksSelector` | `a.list-group-item` | `DOWNLOAD_LINKS_SELECTOR` |
 | `download.directory` | `/mnt/Downloads` | `DOWNLOAD_DIRECTORY` |
 | `download.s3.bucket` | (empty — S3 upload skipped) | `S3_BUCKET` |
 
