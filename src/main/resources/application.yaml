@@ -8,6 +8,7 @@ download:
   directory: "/mnt/Downloads"
   s3:
     bucket: "${S3_BUCKET:}"
+    prefix: "${S3_KEY_PREFIX:downloads/}"
 
 management:
   endpoints:

@@ -29,15 +29,18 @@ public class DocumentDownloaderService {
     private final String linksSelector;
     private final String donwnloadDirectory;
     private final String s3Bucket;
+    private final String s3KeyPrefix;
 
     public DocumentDownloaderService(@Value("${download.axentriaBaseUrl:http://pyhmlw415/AxentriaCI}") String axentriaBaseUrl,
         @Value("${download.linksSelector:a.list-group-item}") String linksSelector,
         @Value("${download.directory:/mnt/Downloads}") String donwnloadDirectory,
-        @Value("${download.s3.bucket:#{null}}") String s3Bucket) {
+        @Value("${download.s3.bucket:#{null}}") String s3Bucket,
+        @Value("${download.s3.prefix:downloads/}") String s3KeyPrefix) {
         this.axentriaBaseUrl = axentriaBaseUrl;
         this.linksSelector = linksSelector;
         this.donwnloadDirectory = donwnloadDirectory;
         this.s3Bucket = s3Bucket;
+        this.s3KeyPrefix = s3KeyPrefix;
     }
 
     public void download(String url) throws Exception {
@@ -137,7 +140,8 @@ public class DocumentDownloaderService {
             return;
         }
         try (S3Client s3 = S3Client.create()) {
-            String prefix = "downloads/" + Instant.now().toEpochMilli() + "/";
+            String prefix = s3KeyPrefix.endsWith("/") ? s3KeyPrefix : s3KeyPrefix + "/";
+            prefix = prefix + Instant.now().toEpochMilli() + "/";
             for (File file : files) {
                 if (!file.isFile()) continue;
                 String key = prefix + file.getName();
